@@ -3,7 +3,7 @@ import { getLeague, getTeam } from "@/data/teams";
 import type { CreationChoices, Effect, PlayerState, Stats } from "./types";
 import { Rng } from "./rng";
 import { enterPhase } from "./progression";
-import { applyEffect, normalizeStats } from "./util";
+import { applyEffect, clamp, normalizeStats } from "./util";
 
 // Statistiques de base d'un jeune joueur (avant bonus de création).
 const BASE_STATS: Stats = {
@@ -18,9 +18,26 @@ const BASE_STATS: Stats = {
 const STARTING_AGE = 17;
 
 /** Construit une nouvelle carrière prête à jouer (première phase déjà tirée). */
+// Bonus de potentiel selon le parcours : un prodige de la SoloQ part avec un
+// plafond plus haut qu'un joueur amateur reconverti.
+const POTENTIAL_BY_ORIGIN: Record<string, number> = {
+  soloq: 8,
+  academie: 4,
+  amateur: 0,
+  streamer: -3,
+};
+
 export function startCareer(creation: CreationChoices, seed: number): PlayerState {
   const team = getTeam(creation.startTeamId);
   const leagueId = team?.leagueId ?? "lfl";
+
+  // Le potentiel est tiré à la création : c'est le talent que tu ignores encore.
+  const potentialRng = new Rng((seed ^ 0x5bf03635) >>> 0);
+  const potential = clamp(
+    potentialRng.int(58, 88) + (POTENTIAL_BY_ORIGIN[creation.originId] ?? 0),
+    55,
+    99,
+  );
 
   const state: PlayerState = {
     seed,
@@ -35,6 +52,7 @@ export function startCareer(creation: CreationChoices, seed: number): PlayerStat
     leagueId,
     retired: false,
     stats: { ...BASE_STATS },
+    potential,
     bestReputation: BASE_STATS.reputation,
     peakLeagueId: leagueId,
     palmares: {

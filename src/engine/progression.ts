@@ -95,16 +95,18 @@ function runOffseason(state: PlayerState, rng: Rng): void {
 }
 
 function handleTransfer(state: PlayerState, rng: Rng): void {
-  const desirability = state.stats.reputation * 0.6 + state.stats.skill * 0.4;
+  // Les recruteurs des ligues majeures regardent d'abord le niveau de jeu ; la
+  // notoriété aide, mais ne suffit pas à décrocher un contrat au plus haut niveau.
+  const desirability = state.stats.reputation * 0.3 + state.stats.skill * 0.7;
   const currentLeague = getLeague(state.leagueId);
   if (!currentLeague) return;
 
   let targetTier: LeagueTier = currentLeague.tier;
   let forceMove = false;
-  if (currentLeague.tier === "ERL" && desirability >= 60) {
+  if (currentLeague.tier === "ERL" && desirability >= 72) {
     targetTier = "MAJOR";
     forceMove = true;
-  } else if (currentLeague.tier === "MAJOR" && desirability < 42) {
+  } else if (currentLeague.tier === "MAJOR" && desirability < 55) {
     targetTier = "ERL";
     forceMove = true;
   }

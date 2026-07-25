@@ -3,6 +3,7 @@ import {
   startCareer,
   resolveChoice,
   next,
+  Rng,
   type CreationChoices,
   type PlayerState,
   type Stats,
@@ -79,6 +80,55 @@ describe("resolveChoice", () => {
     }
     // L'état d'origine n'est pas muté (immutabilité côté appelant).
     expect(s.status).toBe("event");
+  });
+});
+
+describe("potentiel", () => {
+  it("plafonne le niveau de jeu quelle que soit la carrière", () => {
+    for (const seed of [3, 88, 1234, 55555]) {
+      const end = playToEnd(seed);
+      expect(end.potential).toBeGreaterThanOrEqual(55);
+      expect(end.potential).toBeLessThanOrEqual(99);
+      expect(end.stats.skill).toBeLessThanOrEqual(end.potential);
+    }
+  });
+});
+
+describe("équilibrage", () => {
+  it("ne distribue pas le score maximal à tout le monde", () => {
+    // Des choix pris au hasard doivent donner une carrière moyenne, pas un
+    // sans-faute : sans cela le jeu n'aurait aucun enjeu.
+    const scores: number[] = [];
+    for (let i = 1; i <= 60; i++) {
+      const rng = new Rng(i * 7919);
+      let s = startCareer(CREATION, i * 104729);
+      let guard = 0;
+      while (s.status !== "finished" && guard++ < 5000) {
+        s =
+          s.status === "event"
+            ? resolveChoice(s, rng.pick(s.currentEvent!.choices).id)
+            : next(s);
+      }
+      scores.push(s.finalResult!.score);
+    }
+    const perfect = scores.filter((s) => s === 100).length / scores.length;
+    const moyenne = scores.reduce((a, b) => a + b, 0) / scores.length;
+    expect(perfect).toBeLessThan(0.2);
+    expect(moyenne).toBeLessThan(70);
+    expect(new Set(scores).size).toBeGreaterThan(5); // de vrais écarts entre parties
+  });
+
+  it("réserve les compétitions internationales aux ligues majeures", () => {
+    // Un joueur de ligue régionale ne peut pas se qualifier pour le MSI/Worlds.
+    for (const seed of [11, 222, 3333]) {
+      let s = startCareer(CREATION, seed);
+      let guard = 0;
+      while (s.status !== "finished" && guard++ < 5000) {
+        const erl = ["lfl", "superliga", "prime"].includes(s.leagueId);
+        if (erl) expect(s.qualifiedMSI || s.qualifiedWorlds).toBe(false);
+        s = s.status === "event" ? resolveChoice(s, s.currentEvent!.choices[0].id) : next(s);
+      }
+    }
   });
 });
 

@@ -2,12 +2,12 @@ import type { League, Team } from "@/engine/types";
 
 // Ligues fictives inspirées de l'écosystème LoL (ERL régionales + ligues majeures).
 export const LEAGUES: League[] = [
-  { id: "lfl", name: "LFL", tier: "ERL", region: "France", strength: 46 },
-  { id: "superliga", name: "Superliga", tier: "ERL", region: "Espagne", strength: 47 },
-  { id: "prime", name: "Prime League", tier: "ERL", region: "Allemagne", strength: 45 },
-  { id: "lec", name: "LEC", tier: "MAJOR", region: "Europe", strength: 72 },
-  { id: "lck", name: "LCK", tier: "MAJOR", region: "Corée", strength: 80 },
-  { id: "lpl", name: "LPL", tier: "MAJOR", region: "Chine", strength: 79 },
+  { id: "lfl", name: "LFL", tier: "ERL", region: "France", strength: 50 },
+  { id: "superliga", name: "Superliga", tier: "ERL", region: "Espagne", strength: 51 },
+  { id: "prime", name: "Prime League", tier: "ERL", region: "Allemagne", strength: 49 },
+  { id: "lec", name: "LEC", tier: "MAJOR", region: "Europe", strength: 70 },
+  { id: "lck", name: "LCK", tier: "MAJOR", region: "Corée", strength: 76 },
+  { id: "lpl", name: "LPL", tier: "MAJOR", region: "Chine", strength: 75 },
 ];
 
 // Équipes fictives (noms inventés pour éviter toute marque réelle).

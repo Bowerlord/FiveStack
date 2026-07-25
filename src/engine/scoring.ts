@@ -23,18 +23,18 @@ export function computeFinalResult(state: PlayerState): FinalResult {
   const p = state.palmares;
 
   let score = 0;
-  score += p.worldsWon * 22;
-  score += p.msiWon * 9;
-  score += p.splitsWon * 4;
-  score += p.worldsAppearances * 2.5;
-  score += p.msiAppearances * 1.5;
-  score += p.mvpAwards * 3;
-  score += p.allProSelections * 2;
-  score += state.bestReputation * 0.25; // jusqu'à 25 pts
-  score += clamp(state.stats.argent / 40000, 0, 6); // richesse (jusqu'à ~6 pts)
+  score += p.worldsWon * 16;
+  score += p.msiWon * 7;
+  score += p.splitsWon * 2.5;
+  score += p.worldsAppearances * 2;
+  score += p.msiAppearances * 1;
+  score += p.mvpAwards * 2.5;
+  score += p.allProSelections * 1.5;
+  score += state.bestReputation * 0.18; // jusqu'à 18 pts
+  score += clamp(state.stats.argent / 60000, 0, 5); // richesse (jusqu'à 5 pts)
 
   const peakLeague = getLeague(state.peakLeagueId);
-  if (peakLeague?.tier === "MAJOR") score += 6;
+  if (peakLeague?.tier === "MAJOR") score += 5;
 
   score = Math.round(clamp(score, 0, 100));
 

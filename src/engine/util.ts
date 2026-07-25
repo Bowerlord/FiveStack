@@ -24,6 +24,8 @@ export function applyEffect(state: PlayerState, effect: Effect): void {
     s[key as keyof Stats] += delta;
   }
   state.stats = normalizeStats(s);
+  // Le talent brut ne dépasse jamais le potentiel de la carrière.
+  if (state.stats.skill > state.potential) state.stats.skill = state.potential;
   if (state.stats.reputation > state.bestReputation) {
     state.bestReputation = state.stats.reputation;
   }

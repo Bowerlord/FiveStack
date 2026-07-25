@@ -158,6 +158,8 @@ export interface PlayerState {
   retired: boolean;
 
   stats: Stats;
+  /** Plafond de `skill` propre à la carrière : tout le monde n'a pas le même talent. */
+  potential: number;
   bestReputation: number;
   peakLeagueId: string;
   palmares: Palmares;
