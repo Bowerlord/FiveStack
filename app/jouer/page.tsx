@@ -4,17 +4,16 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useGame, useHydrated } from "@/state/gameStore";
-import HeaderHud from "@/components/HeaderHud";
-import StatsBar from "@/components/StatsBar";
-import { EventCard, OutcomeCard, PhaseResultCard } from "@/components/GameCards";
-import SeasonSummary from "@/components/SeasonSummary";
-import FinalScore from "@/components/FinalScore";
+import GameScreen from "@/components/GameScreen";
 
 export default function JouerPage() {
   const router = useRouter();
   const hydrated = useHydrated();
   const career = useGame((s) => s.career);
   const choose = useGame((s) => s.choose);
+  const clutch = useGame((s) => s.clutch);
+  const offer = useGame((s) => s.offer);
+  const epilogue = useGame((s) => s.epilogue);
   const advance = useGame((s) => s.advance);
   const clear = useGame((s) => s.clear);
 
@@ -54,45 +53,18 @@ export default function JouerPage() {
         </div>
       )}
 
-      <div className="space-y-4">
-        {!finished && (
-          <>
-            <HeaderHud career={career} />
-            <StatsBar stats={career.stats} />
-          </>
-        )}
-
-        {career.status === "event" && career.currentEvent && (
-          <EventCard event={career.currentEvent} onChoose={choose} />
-        )}
-
-        {career.status === "event_result" && career.lastOutcome && (
-          <OutcomeCard outcome={career.lastOutcome} onNext={advance} />
-        )}
-
-        {career.status === "phase_result" && career.lastPhaseResult && (
-          <PhaseResultCard result={career.lastPhaseResult} onNext={advance} />
-        )}
-
-        {career.status === "season_summary" && career.lastSeasonSummary && (
-          <SeasonSummary
-            summary={career.lastSeasonSummary}
-            retired={career.retired}
-            onNext={advance}
-          />
-        )}
-
-        {finished && career.finalResult && (
-          <FinalScore
-            result={career.finalResult}
-            pseudo={career.pseudo}
-            onReplay={() => {
-              clear();
-              router.push("/creer");
-            }}
-          />
-        )}
-      </div>
+      <GameScreen
+        career={career}
+        onChoose={choose}
+        onClutch={clutch}
+        onOffer={offer}
+        onEpilogue={epilogue}
+        onNext={advance}
+        onReplay={() => {
+          clear();
+          router.push("/creer");
+        }}
+      />
     </main>
   );
 }

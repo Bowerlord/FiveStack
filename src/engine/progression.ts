@@ -1,12 +1,19 @@
-import { getLeague, getTeam, getTeamsByTier } from "@/data/teams";
-import type { LeagueTier, Phase, PlayerState, SeasonSummary } from "./types";
+import { getLeague, getTeam } from "@/data/teams";
+import type { Offer, Phase, PlayerState, SeasonSummary } from "./types";
 import { Rng } from "./rng";
 import { drawEvents, getEvent } from "./events";
-import { simulatePhase } from "./simulation";
+import {
+  computePhaseMargin,
+  isDecisiveMoment,
+  resolvePhaseOutcome,
+} from "./simulation";
+import { buildClutchQueue, draftPenalty, loadClutch, stageForPhase } from "./clutch";
+import { metaDelta, pickLearnableArchetype, rollPatch } from "./meta";
+import { acceptOffer, buildOffers } from "./offers";
 import { computeFinalResult } from "./scoring";
 import { applyEffect, cloneState } from "./util";
 
-// ──────────────────────────────  Helpers de phase  ──────────────────────────────
+// ──────────────────────────────  Événements de phase  ──────────────────────────────
 
 function popNextEvent(state: PlayerState): void {
   const id = state.pendingEventIds.shift();
@@ -22,18 +29,53 @@ export function enterPhase(state: PlayerState, phase: Phase, rng: Rng): void {
   if (state.pendingEventIds.length > 0) {
     popNextEvent(state);
   } else {
-    runPhaseOutcome(state, rng);
+    startPhaseOutcome(state, rng);
   }
 }
 
-function runPhaseOutcome(state: PlayerState, rng: Rng): void {
+/**
+ * Fin des événements d'une phase : on calcule la marge de performance, puis on
+ * laisse la main au joueur si l'échéance est décisive (finale, MSI, Worlds).
+ */
+function startPhaseOutcome(state: PlayerState, rng: Rng): void {
   if (state.phase === "preseason") {
-    // Pas d'écran de résultat : on enchaîne sur le split de printemps.
-    enterPhase(state, "spring", rng);
+    enterPhase(state, "spring", rng); // la pré-saison n'a pas de classement
     return;
   }
-  state.lastPhaseResult = simulatePhase(state, state.phase, rng);
+
+  let margin = computePhaseMargin(state, state.phase, rng);
+
+  if (isDecisiveMoment(state.phase, margin)) {
+    const stage = stageForPhase(state.phase);
+    // Un pool étroit se fait bannir ses champions avant même de jouer.
+    const penalty = draftPenalty(state, rng);
+    margin += penalty.delta;
+    if (penalty.note) state.seasonNarrative.push(penalty.note);
+
+    state.pendingMargin = margin;
+    state.clutchDelta = 0;
+    state.clutchStage = stage;
+    state.clutchQueue = buildClutchQueue(state, stage, rng);
+    if (state.clutchQueue.length > 0) {
+      popNextClutch(state);
+      return;
+    }
+  }
+
+  finishPhase(state, margin, rng);
+}
+
+function finishPhase(state: PlayerState, margin: number, rng: Rng): void {
+  state.lastPhaseResult = resolvePhaseOutcome(state, state.phase, margin, rng);
+  state.pendingMargin = null;
+  state.clutchStage = null;
   state.status = "phase_result";
+}
+
+function popNextClutch(state: PlayerState): void {
+  const id = state.clutchQueue.shift();
+  state.currentClutch = id ? loadClutch(id) : null;
+  state.status = "clutch";
 }
 
 function nextPhaseAfter(state: PlayerState): Phase | null {
@@ -62,7 +104,10 @@ function beginSeason(state: PlayerState, rng: Rng): void {
   state.seasonNarrative = [];
   state.transferNote = null;
   state.lastPhaseResult = null;
-  enterPhase(state, "preseason", rng);
+  state.offers = [];
+  // Le jeu change sous les pieds du joueur : nouveau patch chaque saison.
+  state.patch = rollPatch(state.season, rng);
+  state.status = "patch_notes";
 }
 
 function endSeason(state: PlayerState, rng: Rng): void {
@@ -85,65 +130,23 @@ function runOffseason(state: PlayerState, rng: Rng): void {
   // Récupération intersaison.
   applyEffect(state, { forme: rng.int(8, 16), morale: rng.int(3, 8) });
 
-  // Salaire annuel selon la cote et le niveau de ligue.
-  const league = getLeague(state.leagueId);
-  const salaryBase = league?.tier === "MAJOR" ? 60000 : 15000;
-  const salary = Math.round(salaryBase * (0.5 + state.stats.reputation / 100));
-  applyEffect(state, { argent: salary });
+  // La notoriété s'érode si on ne fait plus parler de soi.
+  applyEffect(state, { communaute: -rng.int(1, 4) });
 
-  handleTransfer(state, rng);
+  // Une structure fragile peut ne pas honorer les salaires.
+  const team = getTeam(state.teamId);
+  if (team && rng.chance(Math.max(0, (60 - team.stability) / 160))) {
+    state.seasonNarrative.push(
+      `💸 ${team.name} traverse une crise financière : une partie de ton salaire n'a jamais été versée.`,
+    );
+    applyEffect(state, { morale: -6 });
+  }
 }
 
-function handleTransfer(state: PlayerState, rng: Rng): void {
-  // Les recruteurs des ligues majeures regardent d'abord le niveau de jeu ; la
-  // notoriété aide, mais ne suffit pas à décrocher un contrat au plus haut niveau.
-  const desirability = state.stats.reputation * 0.3 + state.stats.skill * 0.7;
-  const currentLeague = getLeague(state.leagueId);
-  if (!currentLeague) return;
-
-  let targetTier: LeagueTier = currentLeague.tier;
-  let forceMove = false;
-  if (currentLeague.tier === "ERL" && desirability >= 72) {
-    targetTier = "MAJOR";
-    forceMove = true;
-  } else if (currentLeague.tier === "MAJOR" && desirability < 55) {
-    targetTier = "ERL";
-    forceMove = true;
-  }
-
-  if (!forceMove && !rng.chance(0.28)) return; // pas de mouvement cette intersaison
-
-  const candidates = getTeamsByTier(targetTier).filter((t) => t.id !== state.teamId);
-  if (candidates.length === 0) return;
-
-  // On vise une équipe dont le prestige colle à la désirabilité, avec un peu d'aléa.
-  const target = candidates
-    .map((t) => ({ t, gap: Math.abs(t.prestige - (desirability + rng.range(-8, 8))) }))
-    .sort((a, b) => a.gap - b.gap)[0].t;
-
-  const fromMajor = currentLeague.tier === "MAJOR";
-  const toMajor = targetTier === "MAJOR";
-  state.teamId = target.id;
-  state.leagueId = target.leagueId;
-
-  const newLeague = getLeague(target.leagueId);
-  const peakLeague = getLeague(state.peakLeagueId);
-  if (newLeague && (!peakLeague || newLeague.strength > peakLeague.strength)) {
-    state.peakLeagueId = newLeague.id;
-  }
-
-  // Nouvelle équipe : l'alchimie repart de bas.
-  state.stats.chimie = rng.int(30, 45);
-  applyEffect(state, { reputation: toMajor && !fromMajor ? 5 : 2, morale: 4 });
-
-  if (toMajor && !fromMajor) {
-    state.transferNote = `🚀 Transfert en ${newLeague?.name} : tu rejoins ${target.name} !`;
-  } else if (!toMajor && fromMajor) {
-    state.transferNote = `📉 Retour en ${newLeague?.name} chez ${target.name}.`;
-  } else {
-    state.transferNote = `✍️ Nouveau contrat chez ${target.name} (${newLeague?.name}).`;
-  }
-  state.seasonNarrative.push(state.transferNote);
+/** Les offres ne sont proposées qu'aux joueurs encore en activité. */
+function openTransferWindow(state: PlayerState, rng: Rng): void {
+  state.offers = buildOffers(state, rng);
+  state.status = "transfer_choice";
 }
 
 function shouldRetire(state: PlayerState, rng: Rng): boolean {
@@ -181,29 +184,108 @@ function buildSeasonSummary(state: PlayerState): SeasonSummary {
 export function resolveChoice(input: PlayerState, choiceId: string): PlayerState {
   if (input.status !== "event" || !input.currentEvent) return input;
   const state = cloneState(input);
+  const rng = new Rng(state.rngState);
   const event = state.currentEvent!;
   const choice = event.choices.find((c) => c.id === choiceId);
   if (!choice) return input;
 
-  applyEffect(state, choice.effects);
-  state.lastOutcome = {
-    choiceLabel: choice.label,
-    resultText: choice.resultText,
-    effects: choice.effects,
-  };
+  let resultText = choice.resultText;
+  let effects = choice.effects;
+  let gambleWon: boolean | undefined;
+
+  if (choice.risk) {
+    gambleWon = rng.chance(choice.risk.chance);
+    const branch = gambleWon ? choice.risk.success : choice.risk.failure;
+    effects = { ...choice.effects, ...branch.effects };
+    resultText = branch.text;
+  }
+
+  applyEffect(state, effects);
+
+  // Certains choix élargissent le pool de champions.
+  if (choice.learnsArchetype) {
+    const learned = pickLearnableArchetype(state.role, state.pool, rng);
+    if (learned) {
+      state.pool.push(learned);
+      resultText += " Tu ajoutes un nouveau style à ton répertoire.";
+    }
+  }
+
+  state.lastOutcome = { choiceLabel: choice.label, resultText, effects, gambleWon };
   state.status = "event_result";
+  state.rngState = rng.state;
   return state;
 }
 
-/** Fait avancer le jeu depuis un écran intermédiaire (résultat, bilan de saison…). */
+/** Applique le choix d'un moment décisif (draft ou call en jeu). */
+export function resolveClutch(input: PlayerState, choiceId: string): PlayerState {
+  if (input.status !== "clutch" || !input.currentClutch) return input;
+  const state = cloneState(input);
+  const rng = new Rng(state.rngState);
+  const moment = state.currentClutch!;
+  const choice = moment.choices.find((c) => c.id === choiceId);
+  if (!choice) return input;
+
+  let resultText = choice.resultText;
+  let effects = choice.effects;
+  let perfDelta = choice.perfDelta ?? 0;
+  let gambleWon: boolean | undefined;
+
+  if (choice.risk) {
+    gambleWon = rng.chance(choice.risk.chance);
+    const branch = gambleWon ? choice.risk.success : choice.risk.failure;
+    effects = { ...choice.effects, ...branch.effects };
+    resultText = branch.text;
+    perfDelta = branch.perfDelta ?? 0;
+  }
+
+  applyEffect(state, effects);
+  state.clutchDelta += perfDelta;
+  state.lastOutcome = { choiceLabel: choice.label, resultText, effects, gambleWon, perfDelta };
+  state.status = "clutch_result";
+  state.rngState = rng.state;
+  return state;
+}
+
+/** Retient une offre de contrat et enchaîne sur la saison suivante. */
+export function chooseOffer(input: PlayerState, offerId: string): PlayerState {
+  if (input.status !== "transfer_choice") return input;
+  const state = cloneState(input);
+  const rng = new Rng(state.rngState);
+  const offer: Offer | undefined = state.offers.find((o) => o.id === offerId);
+  if (offer) acceptOffer(state, offer);
+  state.offers = [];
+  beginSeason(state, rng);
+  state.rngState = rng.state;
+  return state;
+}
+
+/** Retient une voie de reconversion et clôt la carrière. */
+export function chooseEpilogue(input: PlayerState, pathId: string): PlayerState {
+  if (input.status !== "epilogue") return input;
+  const state = cloneState(input);
+  state.epiloguePathId = pathId;
+  state.finalResult = computeFinalResult(state);
+  state.status = "finished";
+  return state;
+}
+
+/** Fait avancer le jeu depuis un écran intermédiaire (résultat, bilan…). */
 export function next(input: PlayerState): PlayerState {
   const state = cloneState(input);
   const rng = new Rng(state.rngState);
 
   switch (state.status) {
+    case "patch_notes":
+      enterPhase(state, "preseason", rng);
+      break;
     case "event_result":
       if (state.pendingEventIds.length > 0) popNextEvent(state);
-      else runPhaseOutcome(state, rng);
+      else startPhaseOutcome(state, rng);
+      break;
+    case "clutch_result":
+      if (state.clutchQueue.length > 0) popNextClutch(state);
+      else finishPhase(state, (state.pendingMargin ?? 0) + state.clutchDelta, rng);
       break;
     case "phase_result": {
       const nxt = nextPhaseAfter(state);
@@ -212,17 +294,15 @@ export function next(input: PlayerState): PlayerState {
       break;
     }
     case "season_summary":
-      if (state.retired) {
-        state.finalResult = computeFinalResult(state);
-        state.status = "finished";
-      } else {
-        beginSeason(state, rng);
-      }
+      if (state.retired) state.status = "epilogue";
+      else openTransferWindow(state, rng);
       break;
     default:
-      break; // 'event' et 'finished' : rien à faire
+      break; // 'event', 'clutch', 'transfer_choice', 'epilogue', 'finished'
   }
 
   state.rngState = rng.state;
   return state;
 }
+
+export { metaDelta };

@@ -11,11 +11,12 @@ import {
 } from "@/data/attributes";
 import { getStartTeams } from "@/data/teams";
 import { getLeague } from "@/data/teams";
+import { archetypesForRole } from "@/data/archetypes";
 import { effectLines } from "@/lib/display";
 
 const START_TEAMS = getStartTeams();
 
-const STEPS = ["Identité", "Rôle", "Parcours", "Mode de vie", "Entourage", "Équipe"] as const;
+const STEPS = ["Identité", "Rôle", "Style", "Parcours", "Mode de vie", "Entourage", "Équipe"] as const;
 
 export default function CharacterCreation({
   onComplete,
@@ -30,12 +31,28 @@ export default function CharacterCreation({
   const [lifestyleId, setLifestyleId] = useState("equilibre");
   const [entourageId, setEntourageId] = useState("coach");
   const [startTeamId, setStartTeamId] = useState(START_TEAMS[0].id);
+  const [signatureId, setSignatureId] = useState(archetypesForRole("Mid")[0].id);
+
+  // Changer de rôle invalide la signature : chaque poste a ses propres styles.
+  const roleArchetypes = archetypesForRole(role);
+  const currentSignature = roleArchetypes.some((a) => a.id === signatureId)
+    ? signatureId
+    : roleArchetypes[0].id;
 
   const canNext = step === 0 ? pseudo.trim().length > 0 : true;
   const isLast = step === STEPS.length - 1;
 
   function finish() {
-    onComplete({ pseudo, nationalityId, role, originId, lifestyleId, entourageId, startTeamId });
+    onComplete({
+      pseudo,
+      nationalityId,
+      role,
+      originId,
+      lifestyleId,
+      entourageId,
+      startTeamId,
+      signatureId: currentSignature,
+    });
   }
 
   return (
@@ -110,6 +127,27 @@ export default function CharacterCreation({
       )}
 
       {step === 2 && (
+        <div>
+          <StepTitle>Ton style de prédilection</StepTitle>
+          <p className="mb-4 text-sm text-white/60">
+            C&apos;est ta marque de fabrique. Chaque saison, un patch renforce ou affaiblit les
+            styles : rester sur un seul te rend prévisible, en apprendre d&apos;autres te protège.
+          </p>
+          <div className="space-y-2">
+            {roleArchetypes.map((a) => (
+              <SelectableRow
+                key={a.id}
+                selected={currentSignature === a.id}
+                onClick={() => setSignatureId(a.id)}
+                title={a.label}
+                description={a.description}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {step === 3 && (
         <OptionStep
           title="Ton parcours jusqu'ici"
           options={ORIGINS}
@@ -118,7 +156,7 @@ export default function CharacterCreation({
         />
       )}
 
-      {step === 3 && (
+      {step === 4 && (
         <OptionStep
           title="Ton mode de vie"
           options={LIFESTYLES}
@@ -127,7 +165,7 @@ export default function CharacterCreation({
         />
       )}
 
-      {step === 4 && (
+      {step === 5 && (
         <OptionStep
           title="Ton entourage"
           options={ENTOURAGES}
@@ -136,7 +174,7 @@ export default function CharacterCreation({
         />
       )}
 
-      {step === 5 && (
+      {step === 6 && (
         <div>
           <StepTitle>Ta première équipe</StepTitle>
           <p className="mb-4 text-sm text-white/60">

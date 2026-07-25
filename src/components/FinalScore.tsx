@@ -29,6 +29,15 @@ export default function FinalScore({
           saison(s) · sommet atteint : {result.peakLeagueName}
         </div>
 
+        {result.epilogueNarrative && (
+          <div className="mb-5 rounded-xl border border-neon-cyan/30 bg-neon-cyan/5 p-4">
+            <div className="text-sm font-bold uppercase tracking-wider text-neon-cyan">
+              Après la carrière — {result.epilogueLabel}
+            </div>
+            <p className="mt-2 leading-relaxed text-white/75">{result.epilogueNarrative}</p>
+          </div>
+        )}
+
         <h3 className="mb-2 text-sm font-semibold uppercase tracking-wider text-white/50">
           Palmarès & faits marquants
         </h3>

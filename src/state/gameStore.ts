@@ -4,6 +4,9 @@ import { persist, createJSONStorage } from "zustand/middleware";
 import {
   startCareer,
   resolveChoice,
+  resolveClutch,
+  chooseOffer,
+  chooseEpilogue,
   next,
   randomSeed,
   type CreationChoices,
@@ -43,6 +46,9 @@ interface GameStore {
   career: PlayerState | null;
   startNew: (creation: CreationChoices) => void;
   choose: (choiceId: string) => void;
+  clutch: (choiceId: string) => void;
+  offer: (offerId: string) => void;
+  epilogue: (pathId: string) => void;
   advance: () => void;
   clear: () => void;
 }
@@ -55,6 +61,18 @@ export const useGame = create<GameStore>()(
       choose: (choiceId) => {
         const c = get().career;
         if (c) set({ career: resolveChoice(c, choiceId) });
+      },
+      clutch: (choiceId) => {
+        const c = get().career;
+        if (c) set({ career: resolveClutch(c, choiceId) });
+      },
+      offer: (offerId) => {
+        const c = get().career;
+        if (c) set({ career: chooseOffer(c, offerId) });
+      },
+      epilogue: (pathId) => {
+        const c = get().career;
+        if (c) set({ career: chooseEpilogue(c, pathId) });
       },
       advance: () => {
         const c = get().career;

@@ -2,8 +2,14 @@ import { describe, it, expect } from "vitest";
 import {
   startCareer,
   resolveChoice,
+  resolveClutch,
+  chooseOffer,
+  chooseEpilogue,
   next,
   Rng,
+  meetsRequirements,
+  missingRequirements,
+  availableEpiloguePaths,
   type CreationChoices,
   type PlayerState,
   type Stats,
@@ -17,26 +23,49 @@ const CREATION: CreationChoices = {
   lifestyleId: "discipline",
   entourageId: "coach",
   startTeamId: "sirius",
+  signatureId: "mid_control",
 };
 
 function statsInBounds(s: Stats): boolean {
-  const keys: (keyof Stats)[] = ["skill", "reputation", "morale", "forme", "chimie"];
+  const keys: (keyof Stats)[] = ["skill", "reputation", "morale", "forme", "chimie", "communaute"];
   const ok01 = keys.every((k) => s[k] >= 0 && s[k] <= 100);
   return ok01 && s.argent >= 0;
 }
 
-/** Joue une carrière jusqu'au bout en choisissant toujours la 1re option (déterministe). */
+/**
+ * Avance d'un pas, en tranchant chaque écran interactif. `pick` choisit l'option
+ * parmi celles réellement disponibles (les choix verrouillés sont exclus).
+ */
+function step(state: PlayerState, pick: <T>(options: T[]) => T): PlayerState {
+  switch (state.status) {
+    case "event": {
+      const open = state.currentEvent!.choices.filter((c) =>
+        meetsRequirements(state.stats, c.requires),
+      );
+      return resolveChoice(state, pick(open).id);
+    }
+    case "clutch": {
+      const open = state.currentClutch!.choices.filter((c) =>
+        meetsRequirements(state.stats, c.requires),
+      );
+      return resolveClutch(state, pick(open).id);
+    }
+    case "transfer_choice":
+      return chooseOffer(state, pick(state.offers).id);
+    case "epilogue":
+      return chooseEpilogue(state, pick(availableEpiloguePaths(state)).id);
+    default:
+      return next(state);
+  }
+}
+
+/** Joue une carrière jusqu'au bout en prenant toujours la 1re option ouverte. */
 function playToEnd(seed: number): PlayerState {
   let state = startCareer(CREATION, seed);
   let guard = 0;
   while (state.status !== "finished" && guard < 5000) {
     guard++;
-    if (state.status === "event") {
-      const first = state.currentEvent!.choices[0];
-      state = resolveChoice(state, first.id);
-    } else {
-      state = next(state);
-    }
+    state = step(state, (o) => o[0]);
     expect(statsInBounds(state.stats)).toBe(true);
   }
   expect(guard).toBeLessThan(5000);
@@ -55,17 +84,20 @@ describe("startCareer", () => {
     expect(s.stats.skill).toBeGreaterThan(48);
   });
 
-  it("démarre en présentant un événement à résoudre", () => {
+  it("démarre par les patch notes, puis un événement", () => {
     const s = startCareer(CREATION, 999);
-    expect(s.status).toBe("event");
-    expect(s.currentEvent).not.toBeNull();
-    expect(s.currentEvent!.choices.length).toBeGreaterThanOrEqual(2);
+    expect(s.status).toBe("patch_notes");
+    expect(s.patch).not.toBeNull();
+    expect(s.pool).toContain(s.signature);
+    const after = next(s);
+    expect(after.status).toBe("event");
+    expect(after.currentEvent!.choices.length).toBeGreaterThanOrEqual(2);
   });
 });
 
 describe("resolveChoice", () => {
   it("applique l'effet du choix et passe en event_result", () => {
-    const s = startCareer(CREATION, 4242);
+    const s = next(startCareer(CREATION, 4242));
     const event = s.currentEvent!;
     const choice = event.choices[0];
     const after = resolveChoice(s, choice.id);
@@ -104,10 +136,7 @@ describe("équilibrage", () => {
       let s = startCareer(CREATION, i * 104729);
       let guard = 0;
       while (s.status !== "finished" && guard++ < 5000) {
-        s =
-          s.status === "event"
-            ? resolveChoice(s, rng.pick(s.currentEvent!.choices).id)
-            : next(s);
+        s = step(s, (o) => rng.pick(o));
       }
       scores.push(s.finalResult!.score);
     }
@@ -118,6 +147,35 @@ describe("équilibrage", () => {
     expect(new Set(scores).size).toBeGreaterThan(5); // de vrais écarts entre parties
   });
 
+  it("récompense nettement le jeu réfléchi par rapport au hasard", () => {
+    // Le cœur du jeu : si bien choisir ne change rien, il n'y a pas de jeu.
+    const play = (seed: number, smart: boolean) => {
+      const rng = new Rng(seed);
+      let s = startCareer(CREATION, seed * 31);
+      let guard = 0;
+      while (s.status !== "finished" && guard++ < 5000) {
+        s = step(s, (options) => {
+          if (!smart) return rng.pick(options);
+          // Heuristique simple : viser le niveau de jeu et l'impact en match.
+          const score = (o: unknown) => {
+            const c = o as { effects?: Record<string, number>; perfDelta?: number };
+            return (c.effects?.skill ?? 0) * 3 + (c.effects?.chimie ?? 0) * 2 + (c.perfDelta ?? 0) * 2.5;
+          };
+          return [...options].sort((a, b) => score(b) - score(a))[0];
+        });
+      }
+      return s.finalResult!.score;
+    };
+
+    const avg = (smart: boolean) => {
+      let total = 0;
+      for (let i = 1; i <= 25; i++) total += play(i * 7919, smart);
+      return total / 25;
+    };
+
+    expect(avg(true)).toBeGreaterThan(avg(false) + 8);
+  });
+
   it("réserve les compétitions internationales aux ligues majeures", () => {
     // Un joueur de ligue régionale ne peut pas se qualifier pour le MSI/Worlds.
     for (const seed of [11, 222, 3333]) {
@@ -126,9 +184,76 @@ describe("équilibrage", () => {
       while (s.status !== "finished" && guard++ < 5000) {
         const erl = ["lfl", "superliga", "prime"].includes(s.leagueId);
         if (erl) expect(s.qualifiedMSI || s.qualifiedWorlds).toBe(false);
-        s = s.status === "event" ? resolveChoice(s, s.currentEvent!.choices[0].id) : next(s);
+        s = step(s, (o) => o[0]);
       }
     }
+  });
+});
+
+describe("nouveaux systèmes", () => {
+  it("verrouille les choix dont les prérequis ne sont pas atteints", () => {
+    const poor = { ...startCareer(CREATION, 5).stats, forme: 10, chimie: 10, morale: 10 };
+    expect(meetsRequirements(poor, { forme: 50 })).toBe(false);
+    expect(meetsRequirements(poor, { forme: 5 })).toBe(true);
+    expect(missingRequirements(poor, { forme: 50, chimie: 60 })).toHaveLength(2);
+  });
+
+  it("applique un patch à chaque saison et garde la signature dans le pool", () => {
+    let s = startCareer(CREATION, 777);
+    const versions = new Set<string>();
+    let guard = 0;
+    while (s.status !== "finished" && guard++ < 5000) {
+      expect(s.patch).not.toBeNull();
+      expect(s.pool).toContain(s.signature);
+      versions.add(s.patch!.version);
+      s = step(s, (o) => o[0]);
+    }
+    expect(versions.size).toBeGreaterThan(1); // le jeu change au fil des saisons
+  });
+
+  it("propose toujours de rester lors du marché des transferts", () => {
+    let s = startCareer(CREATION, 31337);
+    let guard = 0;
+    let sawTransfer = false;
+    while (s.status !== "finished" && guard++ < 5000) {
+      if (s.status === "transfer_choice") {
+        sawTransfer = true;
+        expect(s.offers.length).toBeGreaterThan(0);
+        expect(s.offers.some((o) => o.kind === "stay")).toBe(true);
+      }
+      s = step(s, (o) => o[0]);
+    }
+    expect(sawTransfer).toBe(true);
+  });
+
+  it("laisse toujours une porte de sortie à la reconversion", () => {
+    let s = startCareer(CREATION, 24680);
+    let guard = 0;
+    let sawEpilogue = false;
+    while (s.status !== "finished" && guard++ < 5000) {
+      if (s.status === "epilogue") {
+        sawEpilogue = true;
+        expect(availableEpiloguePaths(s).length).toBeGreaterThan(0);
+      }
+      s = step(s, (o) => o[0]);
+    }
+    expect(sawEpilogue).toBe(true);
+    expect(s.finalResult!.epilogueLabel).toBeTruthy();
+  });
+
+  it("borne la séquence des moments décisifs", () => {
+    let s = startCareer(CREATION, 8642);
+    let guard = 0;
+    let clutches = 0;
+    while (s.status !== "finished" && guard++ < 5000) {
+      if (s.status === "clutch") {
+        clutches++;
+        expect(s.currentClutch).not.toBeNull();
+        expect(s.clutchQueue.length).toBeLessThanOrEqual(2);
+      }
+      s = step(s, (o) => o[0]);
+    }
+    expect(clutches).toBeGreaterThan(0); // les finales donnent la main au joueur
   });
 });
 

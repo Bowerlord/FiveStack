@@ -1,14 +1,67 @@
 "use client";
 
-import type { ChoiceOutcome, GameEvent, PhaseResult } from "@/engine/types";
-import { effectLines } from "@/lib/display";
+import type {
+  Choice,
+  ChoiceOutcome,
+  ClutchMoment,
+  GameEvent,
+  PhaseResult,
+  Stats,
+} from "@/engine/types";
+import { meetsRequirements, missingRequirements } from "@/engine";
+import { effectLines, statLabel } from "@/lib/display";
+
+/**
+ * Bouton de choix. Les options verrouillées restent visibles avec leur
+ * prérequis : c'est ce qui donne envie de construire un profil plutôt que de
+ * subir des options qui apparaissent sans explication.
+ */
+export function ChoiceButton({
+  choice,
+  stats,
+  onChoose,
+}: {
+  choice: Choice;
+  stats: Stats;
+  onChoose: (id: string) => void;
+}) {
+  const unlocked = meetsRequirements(stats, choice.requires);
+  const missing = missingRequirements(stats, choice.requires);
+
+  if (!unlocked) {
+    return (
+      <div
+        className="w-full cursor-not-allowed rounded-xl border border-white/5 bg-white/[0.02] px-4 py-3 opacity-60"
+        aria-disabled="true"
+      >
+        <span className="font-semibold text-white/40">🔒 {choice.label}</span>
+        <div className="mt-1 text-xs text-rose-300/80">
+          {missing.map(([key, min]) => `${statLabel(key)} ${min} requis`).join(" · ")}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <button className="choice-btn" onClick={() => onChoose(choice.id)}>
+      <span className="font-semibold text-white">{choice.label}</span>
+      {choice.risk && (
+        <span className="ml-2 rounded bg-amber-500/20 px-1.5 py-0.5 text-xs font-bold text-amber-300">
+          🎲 pari {Math.round(choice.risk.chance * 100)} %
+        </span>
+      )}
+    </button>
+  );
+}
 
 // Carte d'événement : titre, contexte et choix.
 export function EventCard({
   event,
+  stats,
   onChoose,
 }: {
   event: GameEvent;
+  stats: Stats;
   onChoose: (choiceId: string) => void;
 }) {
   return (
@@ -17,10 +70,48 @@ export function EventCard({
       <p className="mt-3 leading-relaxed text-white/75">{event.text}</p>
       <div className="mt-6 space-y-3">
         {event.choices.map((c) => (
-          <button key={c.id} className="choice-btn" onClick={() => onChoose(c.id)}>
-            <span className="font-semibold text-white">{c.label}</span>
-          </button>
+          <ChoiceButton key={c.id} choice={c} stats={stats} onChoose={onChoose} />
         ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Moment décisif : draft ou call en jeu. Signalé visuellement comme un temps
+ * fort — c'est ici que se gagnent et se perdent les titres.
+ */
+export function ClutchCard({
+  moment,
+  stats,
+  onChoose,
+}: {
+  moment: ClutchMoment;
+  stats: Stats;
+  onChoose: (choiceId: string) => void;
+}) {
+  const isDraft = moment.kind === "draft";
+  return (
+    <div className="card overflow-hidden border-neon-gold/40">
+      <div
+        className={`px-6 py-3 ${
+          isDraft
+            ? "bg-gradient-to-r from-neon-violet/30 to-neon-blue/20"
+            : "bg-gradient-to-r from-neon-gold/25 to-neon-pink/20"
+        }`}
+      >
+        <div className="text-xs font-bold uppercase tracking-[0.2em] text-white/80">
+          {isDraft ? "⚔️ Phase de draft" : "🔥 Moment décisif"}
+        </div>
+      </div>
+      <div className="p-6">
+        <h2 className="text-xl font-bold text-white">{moment.title}</h2>
+        <p className="mt-3 leading-relaxed text-white/75">{moment.text}</p>
+        <div className="mt-6 space-y-3">
+          {moment.choices.map((c) => (
+            <ChoiceButton key={c.id} choice={c} stats={stats} onChoose={onChoose} />
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -35,11 +126,25 @@ export function OutcomeCard({
   onNext: () => void;
 }) {
   const lines = effectLines(outcome.effects);
+  const gamble = outcome.gambleWon;
+
   return (
     <div className="card p-6">
       <div className="text-sm uppercase tracking-wider text-neon-blue">Tu as choisi</div>
       <h2 className="mt-1 text-lg font-bold text-white">{outcome.choiceLabel}</h2>
+
+      {gamble !== undefined && (
+        <div
+          className={`mt-3 inline-block rounded-lg px-3 py-1 text-sm font-bold ${
+            gamble ? "bg-emerald-500/20 text-emerald-300" : "bg-rose-500/20 text-rose-300"
+          }`}
+        >
+          {gamble ? "🎲 Pari réussi !" : "🎲 Pari perdu…"}
+        </div>
+      )}
+
       <p className="mt-3 leading-relaxed text-white/75">{outcome.resultText}</p>
+
       {lines.length > 0 && (
         <div className="mt-4 flex flex-wrap gap-2">
           {lines.map((l) => (
@@ -56,6 +161,20 @@ export function OutcomeCard({
           ))}
         </div>
       )}
+
+      {outcome.perfDelta !== undefined && outcome.perfDelta !== 0 && (
+        <div
+          className={`mt-3 rounded-xl border px-4 py-2 text-sm font-semibold ${
+            outcome.perfDelta > 0
+              ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-300"
+              : "border-rose-400/30 bg-rose-400/10 text-rose-300"
+          }`}
+        >
+          Impact sur le match : {outcome.perfDelta > 0 ? "+" : ""}
+          {outcome.perfDelta}
+        </div>
+      )}
+
       <button className="btn-primary mt-6 w-full" onClick={onNext}>
         Continuer
       </button>

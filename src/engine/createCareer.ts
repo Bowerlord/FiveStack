@@ -1,8 +1,9 @@
 import { ENTOURAGES, LIFESTYLES, ORIGINS, getOption } from "@/data/attributes";
+import { archetypesForRole } from "@/data/archetypes";
 import { getLeague, getTeam } from "@/data/teams";
 import type { CreationChoices, Effect, PlayerState, Stats } from "./types";
 import { Rng } from "./rng";
-import { enterPhase } from "./progression";
+import { rollPatch } from "./meta";
 import { applyEffect, clamp, normalizeStats } from "./util";
 
 // Statistiques de base d'un jeune joueur (avant bonus de création).
@@ -12,12 +13,12 @@ const BASE_STATS: Stats = {
   morale: 60,
   forme: 70,
   chimie: 45,
+  communaute: 10,
   argent: 5000,
 };
 
 const STARTING_AGE = 17;
 
-/** Construit une nouvelle carrière prête à jouer (première phase déjà tirée). */
 // Bonus de potentiel selon le parcours : un prodige de la SoloQ part avec un
 // plafond plus haut qu'un joueur amateur reconverti.
 const POTENTIAL_BY_ORIGIN: Record<string, number> = {
@@ -27,6 +28,7 @@ const POTENTIAL_BY_ORIGIN: Record<string, number> = {
   streamer: -3,
 };
 
+/** Construit une nouvelle carrière prête à jouer (patch de la saison 1 révélé). */
 export function startCareer(creation: CreationChoices, seed: number): PlayerState {
   const team = getTeam(creation.startTeamId);
   const leagueId = team?.leagueId ?? "lfl";
@@ -39,9 +41,19 @@ export function startCareer(creation: CreationChoices, seed: number): PlayerStat
     99,
   );
 
+  const rng = new Rng(seed >>> 0);
+
+  // Le pool de départ : la signature choisie plus un second style tiré au sort.
+  const roster = archetypesForRole(creation.role);
+  const signature =
+    roster.find((a) => a.id === creation.signatureId)?.id ?? roster[0]?.id ?? "";
+  const others = roster.filter((a) => a.id !== signature);
+  const pool = [signature];
+  if (others.length > 0) pool.push(rng.pick(others).id);
+
   const state: PlayerState = {
     seed,
-    rngState: seed >>> 0,
+    rngState: rng.state,
     creation,
     pseudo: creation.pseudo.trim() || "Rookie",
     nationalityId: creation.nationalityId,
@@ -50,6 +62,7 @@ export function startCareer(creation: CreationChoices, seed: number): PlayerStat
     season: 1,
     teamId: creation.startTeamId,
     leagueId,
+    seasonsAtTeam: 1,
     retired: false,
     stats: { ...BASE_STATS },
     potential,
@@ -64,19 +77,29 @@ export function startCareer(creation: CreationChoices, seed: number): PlayerStat
       mvpAwards: 0,
       allProSelections: 0,
     },
-    status: "event",
+    pool,
+    signature,
+    patch: null,
+    status: "patch_notes",
     phase: "preseason",
     pendingEventIds: [],
     usedEventIds: [],
     currentEvent: null,
     lastOutcome: null,
     lastPhaseResult: null,
+    pendingMargin: null,
+    clutchQueue: [],
+    currentClutch: null,
+    clutchDelta: 0,
+    clutchStage: null,
+    offers: [],
     qualifiedMSI: false,
     qualifiedWorlds: false,
     seasonResults: [],
     seasonNarrative: [],
     transferNote: null,
     lastSeasonSummary: null,
+    epiloguePathId: null,
     finalResult: null,
   };
 
@@ -90,12 +113,10 @@ export function startCareer(creation: CreationChoices, seed: number): PlayerStat
   state.stats = normalizeStats(state.stats);
   state.bestReputation = Math.max(state.bestReputation, state.stats.reputation);
 
-  // On lance la première phase (pré-saison) avec un RNG dérivé de la graine.
-  const rng = new Rng(state.rngState);
-  enterPhase(state, "preseason", rng);
+  // Premier patch : la carrière commence par découvrir l'état du jeu.
+  state.patch = rollPatch(1, rng);
   state.rngState = rng.state;
 
-  // Sécurité : la ligue de départ est bien la ligue de pic initiale.
   if (getLeague(leagueId)) state.peakLeagueId = leagueId;
 
   return state;

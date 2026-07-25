@@ -10,10 +10,11 @@ export interface StatMeta {
 // Statistiques affichées sous forme de barres (0-100). `argent` est traité à part.
 export const STAT_META: StatMeta[] = [
   { key: "skill", label: "Skill", icon: "🎯", bar: "bg-neon-blue" },
-  { key: "reputation", label: "Cote", icon: "📣", bar: "bg-neon-violet" },
+  { key: "reputation", label: "Cote", icon: "📈", bar: "bg-neon-violet" },
   { key: "morale", label: "Moral", icon: "🧠", bar: "bg-neon-cyan" },
   { key: "forme", label: "Forme", icon: "💪", bar: "bg-neon-gold" },
   { key: "chimie", label: "Chimie", icon: "🤝", bar: "bg-neon-pink" },
+  { key: "communaute", label: "Communauté", icon: "📣", bar: "bg-emerald-400" },
 ];
 
 const STAT_LABELS: Record<StatKey, string> = {
@@ -22,8 +23,14 @@ const STAT_LABELS: Record<StatKey, string> = {
   morale: "Moral",
   forme: "Forme",
   chimie: "Chimie",
+  communaute: "Communauté",
   argent: "Argent",
 };
+
+/** Libellé lisible d'une statistique (pour les prérequis, notamment). */
+export function statLabel(key: StatKey): string {
+  return STAT_LABELS[key];
+}
 
 export function formatArgent(v: number): string {
   return `${v.toLocaleString("fr-FR")} €`;

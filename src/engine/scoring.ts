@@ -1,4 +1,5 @@
 import { getLeague, getTeam } from "@/data/teams";
+import { getEpiloguePath } from "./epilogue";
 import type { FinalResult, PlayerState } from "./types";
 import { clamp } from "./util";
 
@@ -23,18 +24,23 @@ export function computeFinalResult(state: PlayerState): FinalResult {
   const p = state.palmares;
 
   let score = 0;
-  score += p.worldsWon * 16;
-  score += p.msiWon * 7;
-  score += p.splitsWon * 2.5;
+  score += p.worldsWon * 13;
+  score += p.msiWon * 5;
+  score += p.splitsWon * 2;
   score += p.worldsAppearances * 2;
   score += p.msiAppearances * 1;
-  score += p.mvpAwards * 2.5;
-  score += p.allProSelections * 1.5;
-  score += state.bestReputation * 0.18; // jusqu'à 18 pts
+  score += p.mvpAwards * 2;
+  score += p.allProSelections * 1;
+  score += state.bestReputation * 0.14; // jusqu'à 16 pts
+  score += state.stats.communaute * 0.06; // l'empreinte laissée sur la communauté
   score += clamp(state.stats.argent / 60000, 0, 5); // richesse (jusqu'à 5 pts)
 
   const peakLeague = getLeague(state.peakLeagueId);
-  if (peakLeague?.tier === "MAJOR") score += 5;
+  if (peakLeague?.tier === "MAJOR") score += 4;
+
+  // La reconversion fait partie de la carrière : en esport, l'après compte.
+  const epilogue = state.epiloguePathId ? getEpiloguePath(state.epiloguePathId) : undefined;
+  if (epilogue) score += epilogue.scoreBonus;
 
   score = Math.round(clamp(score, 0, 100));
 
@@ -50,6 +56,8 @@ export function computeFinalResult(state: PlayerState): FinalResult {
     peakLeagueName: peakLeague?.name ?? "—",
     palmares: p,
     highlights,
+    epilogueLabel: epilogue?.label,
+    epilogueNarrative: epilogue?.narrative,
   };
 }
 
@@ -64,6 +72,7 @@ function buildHighlights(state: PlayerState): string[] {
   if (p.allProSelections > 0) out.push(`📋 Sélections All-Pro : ${p.allProSelections}`);
   out.push(`💰 Fortune amassée : ${state.stats.argent.toLocaleString("fr-FR")} €`);
   out.push(`📈 Cote maximale atteinte : ${state.bestReputation}/100`);
+  out.push(`📣 Capital communauté : ${state.stats.communaute}/100`);
   const team = getTeam(state.teamId);
   if (team) out.push(`🎽 Dernier club : ${team.name}`);
   if (out.length === 1) out.unshift("Une carrière discrète, loin des trophées.");
