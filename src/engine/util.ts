@@ -1,4 +1,4 @@
-import type { Effect, PlayerState, Stats } from "./types";
+import type { Effect, PlayerState, Requirement, Stats } from "./types";
 
 export function clamp(v: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, v));
@@ -12,6 +12,7 @@ export function normalizeStats(stats: Stats): Stats {
     morale: clamp(Math.round(stats.morale), 0, 100),
     forme: clamp(Math.round(stats.forme), 0, 100),
     chimie: clamp(Math.round(stats.chimie), 0, 100),
+    communaute: clamp(Math.round(stats.communaute), 0, 100),
     argent: Math.max(0, Math.round(stats.argent)),
   };
 }
@@ -29,6 +30,20 @@ export function applyEffect(state: PlayerState, effect: Effect): void {
   if (state.stats.reputation > state.bestReputation) {
     state.bestReputation = state.stats.reputation;
   }
+}
+
+/** Le joueur satisfait-il les prérequis d'une option ? */
+export function meetsRequirements(stats: Stats, requires?: Requirement): boolean {
+  if (!requires) return true;
+  return Object.entries(requires).every(([key, min]) => stats[key as keyof Stats] >= (min ?? 0));
+}
+
+/** Prérequis non satisfaits, pour expliquer au joueur ce qui lui manque. */
+export function missingRequirements(stats: Stats, requires?: Requirement): [keyof Stats, number][] {
+  if (!requires) return [];
+  return Object.entries(requires)
+    .filter(([key, min]) => stats[key as keyof Stats] < (min ?? 0))
+    .map(([key, min]) => [key as keyof Stats, min ?? 0]);
 }
 
 /** Clone profond d'un état (les fonctions publiques travaillent sur une copie). */

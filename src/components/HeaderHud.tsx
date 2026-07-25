@@ -1,8 +1,9 @@
 "use client";
 
 import type { PlayerState } from "@/engine/types";
-import { phaseLabel } from "@/engine";
+import { phaseLabel, soloQueueRank } from "@/engine";
 import { getNationality } from "@/data/attributes";
+import { archetypeLabel } from "@/data/archetypes";
 import { getLeague, getTeam } from "@/data/teams";
 
 export default function HeaderHud({ career }: { career: PlayerState }) {
@@ -11,24 +12,41 @@ export default function HeaderHud({ career }: { career: PlayerState }) {
   const league = getLeague(career.leagueId);
 
   return (
-    <div className="card flex flex-wrap items-center justify-between gap-3 p-4">
-      <div className="flex items-center gap-3">
-        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-neon-blue/15 text-2xl">
-          {nat?.flag ?? "🎮"}
-        </div>
-        <div>
-          <div className="text-lg font-bold leading-tight">{career.pseudo}</div>
-          <div className="text-sm text-white/60">
-            {career.role} · {career.age} ans
+    <div className="card p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-neon-blue/15 text-2xl">
+            {nat?.flag ?? "🎮"}
           </div>
+          <div>
+            <div className="text-lg font-bold leading-tight">{career.pseudo}</div>
+            <div className="text-sm text-white/60">
+              {career.role} · {career.age} ans · ★ {archetypeLabel(career.signature)}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <Chip label="Saison" value={String(career.season)} />
+          <Chip label="Équipe" value={team?.name ?? "—"} />
+          <Chip label="Ligue" value={league?.name ?? "—"} accent />
+          <Chip label="Phase" value={phaseLabel(career.phase)} />
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 text-sm">
-        <Chip label="Saison" value={String(career.season)} />
-        <Chip label="Équipe" value={team?.name ?? "—"} />
-        <Chip label="Ligue" value={league?.name ?? "—"} accent />
-        <Chip label="Phase" value={phaseLabel(career.phase)} />
+      {/* Ligne « vitrine publique » : ton ladder et le patch en cours. */}
+      <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-white/10 pt-3 text-xs">
+        <span className="rounded-md bg-neon-cyan/15 px-2 py-1 font-semibold text-neon-cyan">
+          🪜 SoloQ : {soloQueueRank(career)}
+        </span>
+        {career.patch && (
+          <span className="rounded-md bg-white/5 px-2 py-1 text-white/60">
+            🔧 Patch {career.patch.version}
+          </span>
+        )}
+        <span className="rounded-md bg-white/5 px-2 py-1 text-white/60">
+          🎭 Pool : {career.pool.length} style{career.pool.length > 1 ? "s" : ""}
+        </span>
       </div>
     </div>
   );

@@ -1,10 +1,10 @@
-import { EVENTS } from "@/data/events.fr";
+import { EVENTS } from "@/data/events";
 import type { GameEvent, Phase, PlayerState } from "./types";
 import type { Rng } from "./rng";
 
 // Nombre d'événements tirés par phase.
 const EVENTS_PER_PHASE: Record<Phase, number> = {
-  preseason: 1,
+  preseason: 2,
   spring: 2,
   summer: 2,
   msi: 1,

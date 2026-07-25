@@ -3,7 +3,11 @@
 export * from "./types";
 export { Rng, randomSeed } from "./rng";
 export { startCareer } from "./createCareer";
-export { resolveChoice, next } from "./progression";
+export { resolveChoice, resolveClutch, chooseOffer, chooseEpilogue, next } from "./progression";
 export { computeFinalResult } from "./scoring";
 export { phaseLabel } from "./simulation";
-export { normalizeStats } from "./util";
+export { normalizeStats, meetsRequirements, missingRequirements } from "./util";
+export { metaSummary, metaDelta } from "./meta";
+export { availableEpiloguePaths, getEpiloguePath, EPILOGUE_PATHS } from "./epilogue";
+export { desirability } from "./offers";
+export { soloQueueRank } from "./ladder";
