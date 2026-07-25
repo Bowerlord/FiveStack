@@ -1,0 +1,45 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-display: "Rajdhani", "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+
+html,
+body {
+  padding: 0;
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  color: #e7e9f5;
+  background:
+    radial-gradient(1200px 600px at 15% -10%, rgba(91, 140, 255, 0.18), transparent 60%),
+    radial-gradient(1000px 500px at 100% 0%, rgba(154, 107, 255, 0.16), transparent 55%),
+    radial-gradient(900px 700px at 50% 120%, rgba(55, 240, 216, 0.1), transparent 60%),
+    #0a0a12;
+  background-attachment: fixed;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+@layer utilities {
+  .card {
+    @apply rounded-2xl border border-white/10 bg-ink-900/70 backdrop-blur-sm shadow-xl;
+  }
+  .btn {
+    @apply rounded-xl px-5 py-3 font-semibold transition-all duration-150 active:scale-[0.98];
+  }
+  .btn-primary {
+    @apply btn bg-neon-blue text-ink-950 hover:brightness-110 shadow-glow;
+  }
+  .btn-ghost {
+    @apply btn border border-white/15 bg-white/5 text-white hover:bg-white/10;
+  }
+  .choice-btn {
+    @apply w-full text-left rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3
+           hover:border-neon-blue/60 hover:bg-neon-blue/10 transition-all duration-150 active:scale-[0.99];
+  }
+}
