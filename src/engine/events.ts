@@ -1,6 +1,7 @@
 import { EVENTS } from "@/data/events";
 import type { GameEvent, Phase, PlayerState } from "./types";
 import type { Rng } from "./rng";
+import { matchesContext } from "./context";
 
 // Nombre d'événements tirés par phase.
 const EVENTS_PER_PHASE: Record<Phase, number> = {
@@ -12,12 +13,8 @@ const EVENTS_PER_PHASE: Record<Phase, number> = {
 };
 
 function isEligible(event: GameEvent, state: PlayerState, phase: Phase): boolean {
-  if (event.phases && !event.phases.includes(phase)) return false;
-  if (event.minAge !== undefined && state.age < event.minAge) return false;
-  if (event.maxAge !== undefined && state.age > event.maxAge) return false;
-  if (event.roles && !event.roles.includes(state.role)) return false;
   if (state.usedEventIds.includes(event.id)) return false;
-  return true;
+  return matchesContext(event, state, phase);
 }
 
 /**

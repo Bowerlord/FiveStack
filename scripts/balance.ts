@@ -8,6 +8,7 @@ import {
   startCareer,
   resolveChoice,
   resolveClutch,
+  resolveArcChoice,
   chooseOffer,
   chooseEpilogue,
   next,
@@ -89,6 +90,7 @@ const smart: Strategy = (options, state) => {
     }
     // Élargir son pool paie sur la durée : le patch peut tuer un style unique.
     if (c.learnsArchetype && state.pool.length < 4) v += 14;
+    if (c.raisesPotential) v += 18; // repousser le plafond paie sur toute la carrière
     // Se soigner quand la forme devient critique.
     if (state.stats.forme < 40 && (c.effects.forme ?? 0) > 0) v += 12;
     if (v > bestValue) {
@@ -115,6 +117,9 @@ function play(seed: number, strategy: Strategy, creation?: CreationChoices): Pla
         break;
       case "clutch":
         s = resolveClutch(s, strategy(openChoices(s.currentClutch!.choices, s), s, rng).id);
+        break;
+      case "arc":
+        s = resolveArcChoice(s, strategy(openChoices(s.currentArcStep!.choices, s), s, rng).id);
         break;
       case "transfer_choice":
         s = chooseOffer(s, rng.pick(s.offers).id);

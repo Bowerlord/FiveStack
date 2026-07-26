@@ -6,6 +6,7 @@ import { ROLE_EVENTS } from "./roles.fr";
 import { ORG_EVENTS } from "./org.fr";
 import { COMMUNITY_EVENTS } from "./community.fr";
 import { GENERIC_EVENTS } from "./generic.fr";
+import { CONTEXT_EVENTS } from "./context.fr";
 
 // Pool complet. Ajouter du contenu = pousser un objet dans le fichier thématique
 // correspondant ; le moteur (tirage pondéré, sans répétition) n'a rien à savoir.
@@ -18,6 +19,7 @@ export const EVENTS: GameEvent[] = [
   ...ORG_EVENTS,
   ...COMMUNITY_EVENTS,
   ...GENERIC_EVENTS,
+  ...CONTEXT_EVENTS,
 ];
 
 export function getEventById(id: string): GameEvent | undefined {

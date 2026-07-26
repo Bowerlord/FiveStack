@@ -19,6 +19,7 @@ export default function App() {
   const startNew = useGame((s) => s.startNew);
   const choose = useGame((s) => s.choose);
   const clutch = useGame((s) => s.clutch);
+  const arc = useGame((s) => s.arc);
   const offer = useGame((s) => s.offer);
   const epilogue = useGame((s) => s.epilogue);
   const advance = useGame((s) => s.advance);
@@ -60,6 +61,7 @@ export default function App() {
         }}
         choose={choose}
         clutch={clutch}
+        arc={arc}
         offer={offer}
         epilogue={epilogue}
         advance={advance}
@@ -127,6 +129,7 @@ function PlayScreen({
   onReplay,
   choose,
   clutch,
+  arc,
   offer,
   epilogue,
   advance,
@@ -136,6 +139,7 @@ function PlayScreen({
   onReplay: () => void;
   choose: (id: string) => void;
   clutch: (id: string) => void;
+  arc: (id: string) => void;
   offer: (id: string) => void;
   epilogue: (id: string) => void;
   advance: () => void;
@@ -177,6 +181,7 @@ function PlayScreen({
         career={career}
         onChoose={choose}
         onClutch={clutch}
+        onArc={arc}
         onOffer={offer}
         onEpilogue={epilogue}
         onNext={advance}

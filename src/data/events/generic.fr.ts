@@ -16,6 +16,7 @@ export const GENERIC_EVENTS: GameEvent[] = [
         requires: { argent: 15000 },
         risk: {
           chance: 0.45,
+          stat: "reputation",
           success: { effects: { argent: 40000, reputation: 3 }, text: "La boîte lève des fonds deux ans plus tard. Ton pari est largement gagnant." },
           failure: { effects: { morale: -4 }, text: "La start-up ferme en dix-huit mois. L'argent est perdu." },
         },

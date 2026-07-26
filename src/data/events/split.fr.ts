@@ -106,6 +106,7 @@ export const SPLIT_EVENTS: GameEvent[] = [
         requires: { skill: 60 },
         risk: {
           chance: 0.5,
+          stat: "skill",
           success: { effects: { skill: 8, communaute: 8, reputation: 5 }, text: "Tu trouves une interaction cassée avant tout le monde. Deux semaines de domination avant le hotfix." },
           failure: { effects: { forme: -6, morale: -4 }, text: "Des dizaines d'heures perdues sur une piste sans issue." },
         },

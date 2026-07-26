@@ -1,5 +1,5 @@
 import { getLeague, getTeam } from "@/data/teams";
-import type { Offer, Phase, PlayerState, SeasonSummary } from "./types";
+import type { Effect, Offer, Phase, PlayerState, SeasonSummary } from "./types";
 import { Rng } from "./rng";
 import { drawEvents, getEvent } from "./events";
 import {
@@ -10,6 +10,9 @@ import {
 import { buildClutchQueue, draftPenalty, loadClutch, stageForPhase } from "./clutch";
 import { metaDelta, pickLearnableArchetype, rollPatch } from "./meta";
 import { acceptOffer, buildOffers } from "./offers";
+import { advanceArc, dueArcStep, maybeStartArc } from "./arcs";
+import { riskChance } from "./risk";
+import { raisePotential } from "./potential";
 import { computeFinalResult } from "./scoring";
 import { applyEffect, cloneState } from "./util";
 
@@ -21,11 +24,34 @@ function popNextEvent(state: PlayerState): void {
   state.status = "event";
 }
 
+/**
+ * Une étape de fil narratif échue passe avant le tirage aléatoire : une
+ * histoire en cours prime toujours sur une situation anodine.
+ */
+function tryArcStep(state: PlayerState, phase: Phase, rng: Rng): boolean {
+  const due = dueArcStep(state, phase);
+  if (due) {
+    state.currentArcId = due.arcId;
+    state.currentArcStep = due.step;
+    state.status = "arc";
+    return true;
+  }
+  const started = maybeStartArc(state, phase, rng);
+  if (started) {
+    state.currentArcStep = started;
+    state.status = "arc";
+    return true;
+  }
+  return false;
+}
+
 /** Entre dans une phase : tire ses événements, ou déclenche directement son issue. */
 export function enterPhase(state: PlayerState, phase: Phase, rng: Rng): void {
   state.phase = phase;
   state.pendingEventIds = drawEvents(state, phase, rng);
   state.currentEvent = null;
+  state.currentArcStep = null;
+  if (tryArcStep(state, phase, rng)) return;
   if (state.pendingEventIds.length > 0) {
     popNextEvent(state);
   } else {
@@ -105,6 +131,7 @@ function beginSeason(state: PlayerState, rng: Rng): void {
   state.transferNote = null;
   state.lastPhaseResult = null;
   state.offers = [];
+  state.orgCollapsed = false;
   // Le jeu change sous les pieds du joueur : nouveau patch chaque saison.
   state.patch = rollPatch(state.season, rng);
   state.status = "patch_notes";
@@ -194,24 +221,89 @@ export function resolveChoice(input: PlayerState, choiceId: string): PlayerState
   let gambleWon: boolean | undefined;
 
   if (choice.risk) {
-    gambleWon = rng.chance(choice.risk.chance);
+    gambleWon = rng.chance(riskChance(choice.risk, state.stats));
     const branch = gambleWon ? choice.risk.success : choice.risk.failure;
     effects = { ...choice.effects, ...branch.effects };
     resultText = branch.text;
   }
 
-  applyEffect(state, effects);
+  const outcome = applyChoiceEffects(state, choice, effects, rng);
+  state.lastOutcome = { choiceLabel: choice.label, resultText: resultText + outcome.suffix, effects, gambleWon, ...outcome.extra };
+  state.status = "event_result";
+  state.rngState = rng.state;
+  return state;
+}
 
-  // Certains choix élargissent le pool de champions.
+/**
+ * Applique les conséquences communes à tous les choix : statistiques, plafond
+ * de talent, apprentissage d'archétype, disparition de l'org, suite d'un arc.
+ */
+function applyChoiceEffects(
+  state: PlayerState,
+  choice: { effects: Effect; learnsArchetype?: boolean; raisesPotential?: number; collapsesOrg?: boolean; arcNext?: { stepId: string | null; delaySeasons?: number } },
+  effects: Effect,
+  rng: Rng,
+): { suffix: string; extra: { skillWasted?: number; potentialRaised?: number } } {
+  let suffix = "";
+  const extra: { skillWasted?: number; potentialRaised?: number } = {};
+
+  // Le plafond de talent est repoussé AVANT d'appliquer les gains, pour que le
+  // travail de fond profite immédiatement.
+  if (choice.raisesPotential) {
+    const gained = raisePotential(state, choice.raisesPotential);
+    if (gained > 0) {
+      extra.potentialRaised = gained;
+      suffix += ` Ton plafond de talent passe à ${state.potential}.`;
+    }
+  }
+
+  const wasted = applyEffect(state, effects);
+  if (wasted > 0) extra.skillWasted = wasted;
+
   if (choice.learnsArchetype) {
     const learned = pickLearnableArchetype(state.role, state.pool, rng);
     if (learned) {
       state.pool.push(learned);
-      resultText += " Tu ajoutes un nouveau style à ton répertoire.";
+      suffix += " Tu ajoutes un nouveau style à ton répertoire.";
     }
   }
 
-  state.lastOutcome = { choiceLabel: choice.label, resultText, effects, gambleWon };
+  if (choice.collapsesOrg) {
+    state.orgCollapsed = true;
+    suffix += " La structure fermera ses portes : tu seras libre à la fin de la saison.";
+  }
+
+  if (state.currentArcId) {
+    advanceArc(state, state.currentArcId, choice.arcNext);
+  }
+
+  return { suffix, extra };
+}
+
+/** Applique le choix d'une étape de fil narratif. */
+export function resolveArcChoice(input: PlayerState, choiceId: string): PlayerState {
+  if (input.status !== "arc" || !input.currentArcStep) return input;
+  const state = cloneState(input);
+  const rng = new Rng(state.rngState);
+  const step = state.currentArcStep!;
+  const choice = step.choices.find((c) => c.id === choiceId);
+  if (!choice) return input;
+
+  let resultText = choice.resultText;
+  let effects = choice.effects;
+  let gambleWon: boolean | undefined;
+
+  if (choice.risk) {
+    gambleWon = rng.chance(riskChance(choice.risk, state.stats));
+    const branch = gambleWon ? choice.risk.success : choice.risk.failure;
+    effects = { ...choice.effects, ...branch.effects };
+    resultText = branch.text;
+  }
+
+  const outcome = applyChoiceEffects(state, choice, effects, rng);
+  state.currentArcStep = null;
+  state.currentArcId = null;
+  state.lastOutcome = { choiceLabel: choice.label, resultText: resultText + outcome.suffix, effects, gambleWon, ...outcome.extra };
   state.status = "event_result";
   state.rngState = rng.state;
   return state;
@@ -232,16 +324,23 @@ export function resolveClutch(input: PlayerState, choiceId: string): PlayerState
   let gambleWon: boolean | undefined;
 
   if (choice.risk) {
-    gambleWon = rng.chance(choice.risk.chance);
+    gambleWon = rng.chance(riskChance(choice.risk, state.stats));
     const branch = gambleWon ? choice.risk.success : choice.risk.failure;
     effects = { ...choice.effects, ...branch.effects };
     resultText = branch.text;
     perfDelta = branch.perfDelta ?? 0;
   }
 
-  applyEffect(state, effects);
+  const wasted = applyEffect(state, effects);
   state.clutchDelta += perfDelta;
-  state.lastOutcome = { choiceLabel: choice.label, resultText, effects, gambleWon, perfDelta };
+  state.lastOutcome = {
+    choiceLabel: choice.label,
+    resultText,
+    effects,
+    gambleWon,
+    perfDelta,
+    ...(wasted > 0 ? { skillWasted: wasted } : {}),
+  };
   state.status = "clutch_result";
   state.rngState = rng.state;
   return state;
@@ -283,6 +382,8 @@ export function next(input: PlayerState): PlayerState {
       if (state.pendingEventIds.length > 0) popNextEvent(state);
       else startPhaseOutcome(state, rng);
       break;
+    case "arc":
+      break; // en attente du choix du joueur
     case "clutch_result":
       if (state.clutchQueue.length > 0) popNextClutch(state);
       else finishPhase(state, (state.pendingMargin ?? 0) + state.clutchDelta, rng);
