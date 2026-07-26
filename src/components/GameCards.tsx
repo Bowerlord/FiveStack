@@ -1,6 +1,7 @@
 "use client";
 
 import type {
+  ArcStep,
   Choice,
   ChoiceOutcome,
   ClutchMoment,
@@ -8,7 +9,7 @@ import type {
   PhaseResult,
   Stats,
 } from "@/engine/types";
-import { meetsRequirements, missingRequirements } from "@/engine";
+import { meetsRequirements, missingRequirements, riskPercent, riskStat } from "@/engine";
 import { effectLines, statLabel } from "@/lib/display";
 
 /**
@@ -25,6 +26,10 @@ export function ChoiceButton({
   stats: Stats;
   onChoose: (id: string) => void;
 }) {
+  // La probabilité affichée est celle du joueur, pas une valeur figée : elle
+  // dépend de la qualité qui gouverne le pari.
+  const chance = choice.risk ? riskPercent(choice.risk, stats) : null;
+  const govStat = choice.risk ? riskStat(choice.risk) : null;
   const unlocked = meetsRequirements(stats, choice.requires);
   const missing = missingRequirements(stats, choice.requires);
 
@@ -45,9 +50,19 @@ export function ChoiceButton({
   return (
     <button className="choice-btn" onClick={() => onChoose(choice.id)}>
       <span className="font-semibold text-white">{choice.label}</span>
-      {choice.risk && (
-        <span className="ml-2 rounded bg-amber-500/20 px-1.5 py-0.5 text-xs font-bold text-amber-300">
-          🎲 pari {Math.round(choice.risk.chance * 100)} %
+      {choice.risk && govStat && chance !== null && (
+        <span className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs">
+          <span className="rounded bg-amber-500/20 px-1.5 py-0.5 font-bold text-amber-300">
+            🎲 {chance} % de réussite
+          </span>
+          <span className="text-white/50">
+            selon ton {statLabel(govStat).toLowerCase()} ({stats[govStat]})
+          </span>
+        </span>
+      )}
+      {choice.raisesPotential !== undefined && (
+        <span className="mt-1.5 block text-xs font-semibold text-neon-cyan">
+          ⛰️ Peut repousser ton plafond de talent
         </span>
       )}
     </button>
@@ -117,6 +132,41 @@ export function ClutchCard({
   );
 }
 
+/**
+ * Étape d'un fil narratif. Signalée comme telle pour que le joueur comprenne
+ * qu'il est dans une histoire qui le suit, et pas devant un événement isolé.
+ */
+export function ArcCard({
+  step,
+  label,
+  stats,
+  onChoose,
+}: {
+  step: ArcStep;
+  label: string;
+  stats: Stats;
+  onChoose: (choiceId: string) => void;
+}) {
+  return (
+    <div className="card overflow-hidden border-neon-violet/40">
+      <div className="bg-gradient-to-r from-neon-violet/30 to-neon-pink/15 px-6 py-3">
+        <div className="text-xs font-bold uppercase tracking-[0.2em] text-white/80">
+          📖 {label}
+        </div>
+      </div>
+      <div className="p-6">
+        <h2 className="text-xl font-bold text-white">{step.title}</h2>
+        <p className="mt-3 leading-relaxed text-white/75">{step.text}</p>
+        <div className="mt-6 space-y-3">
+          {step.choices.map((c) => (
+            <ChoiceButton key={c.id} choice={c} stats={stats} onChoose={onChoose} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Retour après un choix : conséquence narrative + deltas de stats.
 export function OutcomeCard({
   outcome,
@@ -159,6 +209,20 @@ export function OutcomeCard({
               {l.label} {l.text}
             </span>
           ))}
+        </div>
+      )}
+
+      {outcome.skillWasted !== undefined && outcome.skillWasted > 0 && (
+        <div className="mt-3 rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-2 text-sm text-amber-200">
+          ⛰️ {outcome.skillWasted} point{outcome.skillWasted > 1 ? "s" : ""} de skill perdu
+          {outcome.skillWasted > 1 ? "s" : ""} : tu as atteint ton plafond de talent. Seul un travail
+          de fond peut le repousser.
+        </div>
+      )}
+
+      {outcome.potentialRaised !== undefined && outcome.potentialRaised > 0 && (
+        <div className="mt-3 rounded-xl border border-neon-cyan/40 bg-neon-cyan/10 px-4 py-2 text-sm font-semibold text-neon-cyan">
+          ⛰️ Plafond de talent repoussé de +{outcome.potentialRaised}
         </div>
       )}
 

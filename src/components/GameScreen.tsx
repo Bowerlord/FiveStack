@@ -8,7 +8,8 @@ import TransferOffers from "./TransferOffers";
 import Epilogue from "./Epilogue";
 import SeasonSummary from "./SeasonSummary";
 import FinalScore from "./FinalScore";
-import { ClutchCard, EventCard, OutcomeCard, PhaseResultCard } from "./GameCards";
+import { ArcCard, ClutchCard, EventCard, OutcomeCard, PhaseResultCard } from "./GameCards";
+import { arcLabel } from "@/engine";
 
 /**
  * Rendu de l'état de jeu courant. Partagé par l'app Next et la version autonome
@@ -18,6 +19,7 @@ export default function GameScreen({
   career,
   onChoose,
   onClutch,
+  onArc,
   onOffer,
   onEpilogue,
   onNext,
@@ -26,6 +28,7 @@ export default function GameScreen({
   career: PlayerState;
   onChoose: (choiceId: string) => void;
   onClutch: (choiceId: string) => void;
+  onArc: (choiceId: string) => void;
   onOffer: (offerId: string) => void;
   onEpilogue: (pathId: string) => void;
   onNext: () => void;
@@ -41,11 +44,20 @@ export default function GameScreen({
       {!fullscreen && (
         <>
           <HeaderHud career={career} />
-          <StatsBar stats={career.stats} />
+          <StatsBar stats={career.stats} potential={career.potential} />
         </>
       )}
 
       {career.status === "patch_notes" && <PatchNotes career={career} onNext={onNext} />}
+
+      {career.status === "arc" && career.currentArcStep && (
+        <ArcCard
+          step={career.currentArcStep}
+          label={career.currentArcId ? arcLabel(career.currentArcId) : "Ton histoire"}
+          stats={career.stats}
+          onChoose={onArc}
+        />
+      )}
 
       {career.status === "event" && career.currentEvent && (
         <EventCard event={career.currentEvent} stats={career.stats} onChoose={onChoose} />

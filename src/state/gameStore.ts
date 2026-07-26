@@ -5,6 +5,7 @@ import {
   startCareer,
   resolveChoice,
   resolveClutch,
+  resolveArcChoice,
   chooseOffer,
   chooseEpilogue,
   next,
@@ -47,6 +48,7 @@ interface GameStore {
   startNew: (creation: CreationChoices) => void;
   choose: (choiceId: string) => void;
   clutch: (choiceId: string) => void;
+  arc: (choiceId: string) => void;
   offer: (offerId: string) => void;
   epilogue: (pathId: string) => void;
   advance: () => void;
@@ -65,6 +67,10 @@ export const useGame = create<GameStore>()(
       clutch: (choiceId) => {
         const c = get().career;
         if (c) set({ career: resolveClutch(c, choiceId) });
+      },
+      arc: (choiceId) => {
+        const c = get().career;
+        if (c) set({ career: resolveArcChoice(c, choiceId) });
       },
       offer: (offerId) => {
         const c = get().career;

@@ -12,6 +12,7 @@ export default function JouerPage() {
   const career = useGame((s) => s.career);
   const choose = useGame((s) => s.choose);
   const clutch = useGame((s) => s.clutch);
+  const arc = useGame((s) => s.arc);
   const offer = useGame((s) => s.offer);
   const epilogue = useGame((s) => s.epilogue);
   const advance = useGame((s) => s.advance);
@@ -57,6 +58,7 @@ export default function JouerPage() {
         career={career}
         onChoose={choose}
         onClutch={clutch}
+        onArc={arc}
         onOffer={offer}
         onEpilogue={epilogue}
         onNext={advance}

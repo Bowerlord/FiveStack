@@ -17,19 +17,28 @@ export function normalizeStats(stats: Stats): Stats {
   };
 }
 
-/** Applique un effet (deltas) aux stats d'un état, en le bornant. */
-export function applyEffect(state: PlayerState, effect: Effect): void {
+/**
+ * Applique un effet (deltas) aux stats d'un état, en le bornant.
+ * Renvoie les points de skill perdus parce que le plafond de talent est atteint :
+ * un gain avalé en silence passerait pour un bug aux yeux du joueur.
+ */
+export function applyEffect(state: PlayerState, effect: Effect): number {
   const s = state.stats;
   for (const [key, delta] of Object.entries(effect)) {
     if (delta === undefined) continue;
     s[key as keyof Stats] += delta;
   }
   state.stats = normalizeStats(s);
-  // Le talent brut ne dépasse jamais le potentiel de la carrière.
-  if (state.stats.skill > state.potential) state.stats.skill = state.potential;
+
+  let wasted = 0;
+  if (state.stats.skill > state.potential) {
+    wasted = state.stats.skill - state.potential;
+    state.stats.skill = state.potential;
+  }
   if (state.stats.reputation > state.bestReputation) {
     state.bestReputation = state.stats.reputation;
   }
+  return wasted;
 }
 
 /** Le joueur satisfait-il les prérequis d'une option ? */

@@ -3,6 +3,7 @@ import {
   startCareer,
   resolveChoice,
   resolveClutch,
+  resolveArcChoice,
   chooseOffer,
   chooseEpilogue,
   next,
@@ -50,6 +51,12 @@ function step(state: PlayerState, pick: <T>(options: T[]) => T): PlayerState {
       );
       return resolveClutch(state, pick(open).id);
     }
+    case "arc": {
+      const open = state.currentArcStep!.choices.filter((c) =>
+        meetsRequirements(state.stats, c.requires),
+      );
+      return resolveArcChoice(state, pick(open).id);
+    }
     case "transfer_choice":
       return chooseOffer(state, pick(state.offers).id);
     case "epilogue":
@@ -84,20 +91,27 @@ describe("startCareer", () => {
     expect(s.stats.skill).toBeGreaterThan(48);
   });
 
-  it("démarre par les patch notes, puis un événement", () => {
+  it("démarre par les patch notes, puis une situation à trancher", () => {
     const s = startCareer(CREATION, 999);
     expect(s.status).toBe("patch_notes");
     expect(s.patch).not.toBeNull();
     expect(s.pool).toContain(s.signature);
     const after = next(s);
-    expect(after.status).toBe("event");
-    expect(after.currentEvent!.choices.length).toBeGreaterThanOrEqual(2);
+    // Un fil narratif peut prendre la main dès la première saison.
+    expect(["event", "arc"]).toContain(after.status);
+    const choices = after.currentEvent?.choices ?? after.currentArcStep!.choices;
+    expect(choices.length).toBeGreaterThanOrEqual(2);
   });
 });
 
 describe("resolveChoice", () => {
   it("applique l'effet du choix et passe en event_result", () => {
-    const s = next(startCareer(CREATION, 4242));
+    // On avance jusqu'à un événement classique (un arc peut passer devant).
+    let s = next(startCareer(CREATION, 4242));
+    let guard = 0;
+    while (s.status !== "event" && guard++ < 50) {
+      s = s.status === "arc" ? resolveArcChoice(s, s.currentArcStep!.choices[0].id) : next(s);
+    }
     const event = s.currentEvent!;
     const choice = event.choices[0];
     const after = resolveChoice(s, choice.id);

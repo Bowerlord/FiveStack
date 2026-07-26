@@ -34,6 +34,7 @@ export const DRAFT_MOMENTS: ClutchMoment[] = [
         requires: { chimie: 55 },
         risk: {
           chance: 0.55,
+          stat: "chimie",
           success: { perfDelta: 5, effects: { chimie: 4, communaute: 5 }, text: "Ils mordent et gaspillent un ban. Ton coach t'applaudit debout." },
           failure: { perfDelta: -3, effects: { morale: -4 }, text: "Ils ne tombent pas dans le panneau et te contrent proprement. Draft perdue." },
         },
@@ -68,6 +69,7 @@ export const DRAFT_MOMENTS: ClutchMoment[] = [
         effects: {},
         risk: {
           chance: 0.5,
+          stat: "skill",
           success: { perfDelta: 4, effects: { skill: 2 }, text: "Ils s'engagent en premier et tu les punis avec le contre parfait." },
           failure: { perfDelta: -4, effects: { morale: -3 }, text: "Ils prennent exactement ce que tu voulais. Tu joues la game en retard." },
         },
@@ -87,6 +89,7 @@ export const DRAFT_MOMENTS: ClutchMoment[] = [
         effects: { chimie: 5 },
         risk: {
           chance: 0.6,
+          stat: "chimie",
           success: { perfDelta: 4, effects: { skill: 3, communaute: 4 }, text: "Tu le joues comme si tu l'avais toujours joué. Le staff exulte." },
           failure: { perfDelta: -4, effects: { morale: -5 }, text: "Trop peu de reps. Tu rates deux sorts décisifs et ça se voit." },
         },
@@ -144,6 +147,7 @@ export const DRAFT_MOMENTS: ClutchMoment[] = [
         effects: {},
         risk: {
           chance: 0.55,
+          stat: "chimie",
           success: { perfDelta: 5, effects: { chimie: 3 }, text: "Vous survivez à la tempête et vous déroulez en fin de partie." },
           failure: { perfDelta: -4, effects: { morale: -3 }, text: "Vous n'atteignez jamais votre fenêtre. Étouffés avant de pouvoir jouer." },
         },
@@ -167,6 +171,7 @@ export const CALL_MOMENTS: ClutchMoment[] = [
         effects: {},
         risk: {
           chance: 0.55,
+          stat: "chimie",
           success: { perfDelta: 6, effects: { communaute: 6, chimie: 4 }, text: "Vous les surprenez et vous les balayez. Baron gratuit, partie pliée." },
           failure: { perfDelta: -5, effects: { morale: -6 }, text: "Leur carry sortait d'un buisson. Vous perdez le combat et le Baron." },
         },
@@ -202,6 +207,7 @@ export const CALL_MOMENTS: ClutchMoment[] = [
         effects: {},
         risk: {
           chance: 0.5,
+          stat: "skill",
           success: { perfDelta: 6, effects: { communaute: 5 }, text: "Vous volez l'âme sous leur nez. L'arène explose." },
           failure: { perfDelta: -4, effects: { morale: -5, chimie: -3 }, text: "Combat perdu dans la fosse. Ils prennent l'âme et l'ascendant." },
         },
@@ -244,6 +250,7 @@ export const CALL_MOMENTS: ClutchMoment[] = [
         effects: {},
         risk: {
           chance: 0.4,
+          stat: "skill",
           success: { perfDelta: 6, effects: { communaute: 10, reputation: 5 }, text: "Un 1v3 défensif d'anthologie. Le clip tournera pendant des années." },
           failure: { perfDelta: -6, effects: { morale: -7, communaute: -4 }, text: "Tu meurs seul, inutilement. Le clip tournera aussi — pas pour les bonnes raisons." },
         },
@@ -302,6 +309,7 @@ export const CALL_MOMENTS: ClutchMoment[] = [
         effects: {},
         risk: {
           chance: 0.5,
+          stat: "chimie",
           success: { perfDelta: 4, effects: { chimie: 5, communaute: 4 }, text: "Premier sang gratuit et leur jungler décalé. Départ parfait." },
           failure: { perfDelta: -4, effects: { chimie: -3 }, text: "Ils vous attendaient. Vous perdez deux joueurs et tout le tempo." },
         },
@@ -366,6 +374,7 @@ export const CALL_MOMENTS: ClutchMoment[] = [
         effects: {},
         risk: {
           chance: 0.55,
+          stat: "skill",
           success: { perfDelta: 5, effects: { communaute: 4 }, text: "Tu attrapes leur support hors position. La partie se termine dans la foulée." },
           failure: { perfDelta: -4, effects: { morale: -4 }, text: "Tu te fais attraper toi. À ce stade, une mort suffit à tout perdre." },
         },
@@ -412,6 +421,7 @@ export const CALL_MOMENTS: ClutchMoment[] = [
         effects: {},
         risk: {
           chance: 0.45,
+          stat: "skill",
           success: { perfDelta: 7, effects: { communaute: 12, reputation: 6 }, text: "VOLÉ ! L'arène devient folle. Ce smite passera en boucle pendant des années." },
           failure: { perfDelta: -4, effects: { morale: -5 }, text: "Trop tard d'une demi-seconde. Tu meurs dans la fosse, ils ont le Baron." },
         },
@@ -470,6 +480,7 @@ export const CALL_MOMENTS: ClutchMoment[] = [
         requires: { forme: 55 },
         risk: {
           chance: 0.55,
+          stat: "forme",
           success: { perfDelta: 6, effects: { communaute: 6 }, text: "Positionnement parfait au millimètre. Tu efface leur équipe entière." },
           failure: { perfDelta: -4, effects: { morale: -4 }, text: "Un pas de trop. Tu te fais assassiner avant d'avoir touché quoi que ce soit." },
         },

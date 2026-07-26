@@ -73,6 +73,19 @@ export interface RiskOutcome {
   text: string;
 }
 
+/**
+ * Un pari. `chance` est la probabilité de référence ; `stat` désigne la
+ * qualité qui la fait varier — le smite volé dépend du niveau de jeu, l'engage
+ * surprise de la cohésion, le play héroïque de la fraîcheur physique.
+ */
+export interface Risk {
+  chance: number;
+  /** Statistique qui module la réussite (défaut : `skill`). */
+  stat?: StatKey;
+  success: RiskOutcome;
+  failure: RiskOutcome;
+}
+
 export interface Choice {
   id: string;
   label: string;
@@ -83,24 +96,84 @@ export interface Choice {
   /** Modificateur de performance appliqué au match en cours. */
   perfDelta?: number;
   /** Pari : le résultat est tiré au sort (RNG seedé, donc reproductible). */
-  risk?: { chance: number; success: RiskOutcome; failure: RiskOutcome };
+  risk?: Risk;
   /** Fait apprendre un nouvel archétype au joueur (élargit son pool). */
   learnsArchetype?: boolean;
+  /** Repousse le plafond de talent de quelques points (travail de fond). */
+  raisesPotential?: number;
+  /** Libère le joueur de son contrat : la structure ne peut plus le retenir. */
+  collapsesOrg?: boolean;
+  /** Fait avancer l'arc narratif en cours vers une étape donnée (null = fin). */
+  arcNext?: { stepId: string | null; delaySeasons?: number };
 }
 
 export type Phase = "preseason" | "spring" | "msi" | "summer" | "worlds";
 
-export interface GameEvent {
-  id: string;
-  title: string;
-  text: string;
-  /** Phases où l'événement peut apparaître. Absent = toutes phases. */
+/**
+ * Conditions de contexte : un rookie anonyme en ligue régionale et un vétéran
+ * titré en LCK ne doivent pas vivre les mêmes situations.
+ */
+export interface EventContext {
   phases?: Phase[];
   minAge?: number;
   maxAge?: number;
   roles?: Role[];
+  /** Restreint au niveau de ligue (régionale ou majeure). */
+  leagueTier?: LeagueTier[];
+  minSeason?: number;
+  maxSeason?: number;
+  /** Prestige de l'équipe actuelle. */
+  minPrestige?: number;
+  maxPrestige?: number;
+  /** Seuils de statistiques à atteindre pour que la situation ait du sens. */
+  requiresStats?: Requirement;
+  /** Plafonds de statistiques (ex. un événement de crise de moral). */
+  maxStats?: Requirement;
+  /** Nombre minimal de titres majeurs déjà remportés. */
+  minTitles?: number;
+  /** Ancienneté dans l'équipe actuelle (une arrivée récente, un vétéran du club). */
+  minSeasonsAtTeam?: number;
+  maxSeasonsAtTeam?: number;
+  /** Ne se déclenche que si le joueur bute sur son plafond de talent. */
+  atPotentialCap?: boolean;
+}
+
+export interface GameEvent extends EventContext {
+  id: string;
+  title: string;
+  text: string;
   weight?: number; // poids de tirage (défaut 1)
   choices: Choice[];
+}
+
+/** Une étape d'un fil narratif qui se déroule sur plusieurs saisons. */
+export interface ArcStep extends EventContext {
+  id: string;
+  title: string;
+  text: string;
+  choices: Choice[];
+}
+
+/**
+ * Fil narratif : une histoire qui te suit au fil des saisons, avec plusieurs
+ * issues — dont des mauvaises.
+ */
+export interface Arc {
+  id: string;
+  label: string;
+  /** Étape d'entrée du fil. */
+  entry: string;
+  steps: ArcStep[];
+  /** Conditions de démarrage. */
+  trigger?: EventContext;
+  weight?: number;
+}
+
+/** Un fil en cours : quelle étape vient ensuite, et à partir de quelle saison. */
+export interface ActiveArc {
+  arcId: string;
+  stepId: string;
+  dueSeason: number;
 }
 
 /** Compétition concernée par un moment décisif. */
@@ -217,6 +290,7 @@ export interface FinalResult {
 
 export type GameStatus =
   | "patch_notes"
+  | "arc"
   | "event"
   | "event_result"
   | "clutch"
@@ -236,6 +310,10 @@ export interface ChoiceOutcome {
   gambleWon?: boolean;
   /** Impact sur le match en cours, s'il y en a un. */
   perfDelta?: number;
+  /** Points de skill perdus parce que le plafond de talent est atteint. */
+  skillWasted?: number;
+  /** Plafond de talent repoussé par ce choix. */
+  potentialRaised?: number;
 }
 
 export interface PlayerState {
@@ -259,8 +337,15 @@ export interface PlayerState {
   retired: boolean;
 
   stats: Stats;
-  /** Plafond de `skill` propre à la carrière : tout le monde n'a pas le même talent. */
+  /**
+   * Plafond de `skill` propre à la carrière. Ce n'est pas un mur définitif :
+   * un travail de fond peut le repousser de quelques points (voir `potentialGained`).
+   */
   potential: number;
+  /** Potentiel tiré à la création, avant tout travail de fond. */
+  basePotential: number;
+  /** Points de plafond déjà gagnés (limités, et de plus en plus coûteux). */
+  potentialGained: number;
   bestReputation: number;
   peakLeagueId: string;
   palmares: Palmares;
@@ -290,6 +375,15 @@ export interface PlayerState {
 
   // Intersaison
   offers: Offer[];
+  /** La structure a cessé son activité : impossible de prolonger. */
+  orgCollapsed: boolean;
+
+  // Fils narratifs
+  activeArcs: ActiveArc[];
+  completedArcs: string[];
+  /** Étape d'arc en cours d'affichage (prioritaire sur les événements). */
+  currentArcStep: ArcStep | null;
+  currentArcId: string | null;
 
   // Flags de saison
   qualifiedMSI: boolean;
