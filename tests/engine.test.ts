@@ -11,10 +11,14 @@ import {
   meetsRequirements,
   missingRequirements,
   availableEpiloguePaths,
+  isCrisisArc,
   type CreationChoices,
   type PlayerState,
   type Stats,
 } from "@/engine";
+import { buildOffers } from "@/engine/offers";
+import { getStartTeamsFor } from "@/data/teams";
+import { CRISES } from "@/data/crises.fr";
 
 const CREATION: CreationChoices = {
   pseudo: "TestPlayer",
@@ -196,7 +200,7 @@ describe("équilibrage", () => {
       let s = startCareer(CREATION, seed);
       let guard = 0;
       while (s.status !== "finished" && guard++ < 5000) {
-        const erl = ["lfl", "superliga", "prime"].includes(s.leagueId);
+        const erl = ["lfl", "superliga", "prime", "lck_cl", "ldl"].includes(s.leagueId);
         if (erl) expect(s.qualifiedMSI || s.qualifiedWorlds).toBe(false);
         s = step(s, (o) => o[0]);
       }
@@ -268,6 +272,107 @@ describe("nouveaux systèmes", () => {
       s = step(s, (o) => o[0]);
     }
     expect(clutches).toBeGreaterThan(0); // les finales donnent la main au joueur
+  });
+});
+
+describe("crises et fin prématurée", () => {
+  it("déclenche un fil de crise dès qu'une jauge touche le fond", () => {
+    // On force la ruine : la crise doit s'imposer, sans dépendre d'un tirage.
+    let s = startCareer(CREATION, 4321);
+    s = { ...s, stats: { ...s.stats, argent: 0 } };
+    let guard = 0;
+    let sawCrisis = false;
+    while (s.status !== "finished" && guard++ < 5000) {
+      if (s.status === "arc" && isCrisisArc(s.currentArcId)) sawCrisis = true;
+      s = step(s, (o) => o[0]);
+    }
+    expect(sawCrisis).toBe(true);
+  });
+
+  it("permet à un choix de crise de mettre un terme à la carrière", () => {
+    // Le choix « arrêter » du fil de la ruine doit couper la carrière net.
+    let s = startCareer(CREATION, 777);
+    s = { ...s, stats: { ...s.stats, argent: 0 } };
+    let guard = 0;
+    while (guard++ < 5000) {
+      if (s.status === "arc" && s.currentArcId === "crisis_broke") {
+        const quit = s.currentArcStep!.choices.find((c) => c.endsCareer)!;
+        expect(quit).toBeDefined();
+        const after = resolveArcChoice(s, quit.id);
+        expect(after.careerEndedEarly).toBe(true);
+        expect(after.retired).toBe(true);
+        // L'écran suivant est la reconversion, pas la suite de la saison.
+        expect(next(after).status).toBe("epilogue");
+        return;
+      }
+      if (s.status === "finished") break;
+      s = step(s, (o) => o[0]);
+    }
+    throw new Error("le fil de la ruine ne s'est jamais déclenché");
+  });
+
+  it("ne redémarre jamais une crise déjà vécue", () => {
+    // Une crise peut s'étaler sur deux étapes ; ce qu'on interdit, c'est qu'elle
+    // reprenne depuis le début alors qu'on l'a déjà traversée.
+    let s = startCareer(CREATION, 20250726);
+    s = { ...s, stats: { ...s.stats, argent: 0, forme: 12, morale: 12 } };
+    const entries = new Map(CRISES.map((c) => [c.entry, c.id]));
+    const seen: string[] = [];
+    let guard = 0;
+    while (s.status !== "finished" && guard++ < 5000) {
+      if (s.status === "arc" && isCrisisArc(s.currentArcId)) {
+        const startedArc = entries.get(s.currentArcStep!.id);
+        if (startedArc) seen.push(startedArc);
+      }
+      // On évite systématiquement les issues qui arrêtent la carrière, pour
+      // laisser la partie se dérouler et pouvoir compter les répétitions.
+      s = step(s, (options) => {
+        const safe = (options as { endsCareer?: boolean }[]).filter((c) => !c.endsCareer);
+        return (safe.length > 0 ? safe : options)[0] as never;
+      });
+    }
+    expect(new Set(seen).size).toBe(seen.length);
+  });
+});
+
+describe("cohérence du marché", () => {
+  it("ne présente pas un transfert interne à la région comme un départ à l'étranger", () => {
+    // Un joueur de LCK qui rejoint un autre club de LCK ne s'expatrie pas.
+    const base = startCareer({ ...CREATION, nationalityId: "kr" }, 99);
+    const inLck: PlayerState = {
+      ...base,
+      teamId: "seoul",
+      leagueId: "lck",
+      stats: { ...base.stats, skill: 88, reputation: 80 },
+    };
+    const offers = buildOffers(inLck, new Rng(1));
+    for (const o of offers) {
+      const league = o.leagueName;
+      if (league === "LCK") expect(o.kind).not.toBe("import");
+    }
+  });
+
+  it("propose les filières du pays du joueur en premier", () => {
+    expect(getStartTeamsFor("kr")[0].leagueId).toBe("lck_cl");
+    expect(getStartTeamsFor("cn")[0].leagueId).toBe("ldl");
+    // Un joueur européen n'est pas envoyé en Asie pour ses débuts.
+    const first = getStartTeamsFor("fr")[0];
+    expect(["lfl", "superliga", "prime"]).toContain(first.leagueId);
+  });
+
+  it("fait varier les arguments de la prolongation d'une saison à l'autre", () => {
+    // Sans mercato ni statut, l'offre « rester » était identique chaque année.
+    let s = startCareer(CREATION, 5150);
+    const stayArguments = new Set<string>();
+    let guard = 0;
+    while (s.status !== "finished" && guard++ < 5000) {
+      if (s.status === "transfer_choice") {
+        const stay = s.offers.find((o) => o.kind === "stay");
+        if (stay) stayArguments.add([...stay.pros, ...stay.cons].join("|"));
+      }
+      s = step(s, (o) => o[0]);
+    }
+    expect(stayArguments.size).toBeGreaterThan(1);
   });
 });
 

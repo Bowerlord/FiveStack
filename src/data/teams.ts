@@ -1,10 +1,16 @@
 import type { League, Team } from "@/engine/types";
+import { homeRegion, sameMarket } from "./attributes";
 
 // Ligues fictives inspirées de l'écosystème LoL (ERL régionales + ligues majeures).
 export const LEAGUES: League[] = [
   { id: "lfl", name: "LFL", tier: "ERL", region: "France", strength: 50 },
   { id: "superliga", name: "Superliga", tier: "ERL", region: "Espagne", strength: 51 },
   { id: "prime", name: "Prime League", tier: "ERL", region: "Allemagne", strength: 49 },
+  // Filières de formation asiatiques : le point de départ d'un joueur coréen ou
+  // chinois. Niveau plus relevé que les ERL européennes, mais aucune route vers
+  // les Worlds — il faut passer par la ligue majeure de sa région.
+  { id: "lck_cl", name: "LCK Challengers", tier: "ERL", region: "Corée", strength: 60 },
+  { id: "ldl", name: "LDL", tier: "ERL", region: "Chine", strength: 58 },
   { id: "lec", name: "LEC", tier: "MAJOR", region: "Europe", strength: 70 },
   { id: "lck", name: "LCK", tier: "MAJOR", region: "Corée", strength: 76, importBarrier: true },
   { id: "lpl", name: "LPL", tier: "MAJOR", region: "Chine", strength: 75, importBarrier: true },
@@ -19,6 +25,10 @@ export const TEAMS: Team[] = [
   { id: "comets", name: "Comètes Esport", leagueId: "superliga", prestige: 33, stability: 28 },
   { id: "wolves", name: "Wolves Rising", leagueId: "prime", prestige: 37, stability: 44 },
   { id: "ravens", name: "Ravenshold", leagueId: "prime", prestige: 32, stability: 35 },
+  { id: "hanul", name: "Hanul Challengers", leagueId: "lck_cl", prestige: 46, stability: 62 },
+  { id: "jinju", name: "Jinju Rookies", leagueId: "lck_cl", prestige: 41, stability: 48 },
+  { id: "yulong", name: "Yulong Development", leagueId: "ldl", prestige: 44, stability: 55 },
+  { id: "hanpo", name: "Hanpo Youth", leagueId: "ldl", prestige: 39, stability: 41 },
 
   // LEC
   { id: "titans", name: "Titans Gaming", leagueId: "lec", prestige: 74, stability: 78 },
@@ -45,6 +55,34 @@ export function getLeague(id: string): League | undefined {
 
 export function getStartTeams(): Team[] {
   return TEAMS.filter((t) => getLeague(t.leagueId)?.tier === "ERL");
+}
+
+/** Région d'une équipe, via sa ligue. */
+export function teamRegion(teamId: string): string {
+  const team = getTeam(teamId);
+  return (team && getLeague(team.leagueId)?.region) ?? "Europe";
+}
+
+/**
+ * Équipes de départ, celles du pays du joueur d'abord : un Coréen commence en
+ * LCK Challengers, pas en LFL. Les structures étrangères restent accessibles,
+ * mais s'y lancer coûte cher en adaptation.
+ */
+export function getStartTeamsFor(nationalityId: string): Team[] {
+  const home = homeRegion(nationalityId);
+  const erls = getStartTeams();
+  const rank = (t: Team) => {
+    const region = getLeague(t.leagueId)?.region ?? "";
+    if (region === home) return 0; // son pays
+    if (sameMarket(region, home)) return 1; // même marché (Europe)
+    return 2; // expatriation dès les débuts
+  };
+  return [...erls].sort((a, b) => rank(a) - rank(b) || b.prestige - a.prestige);
+}
+
+/** Le joueur serait-il un expatrié dans cette équipe dès son arrivée ? */
+export function isExpatriation(nationalityId: string, teamId: string): boolean {
+  return !sameMarket(teamRegion(teamId), homeRegion(nationalityId));
 }
 
 export function getTeamsByTier(tier: League["tier"]): Team[] {

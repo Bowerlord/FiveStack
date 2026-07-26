@@ -1,6 +1,7 @@
-import { getLeague, getTeam } from "@/data/teams";
+import { getLeague } from "@/data/teams";
 import type { EventContext, Phase, PlayerState, Stats } from "./types";
 import { isAtCap } from "./potential";
+import { currentPrestige } from "./mercato";
 
 // Une situation doit coller à l'endroit où l'on se trouve : un rookie anonyme
 // en ligue régionale et un vétéran titré en LCK ne vivent pas les mêmes choses.
@@ -40,7 +41,7 @@ export function matchesContext(
   if (ctx.minSeason !== undefined && state.season < ctx.minSeason) return false;
   if (ctx.maxSeason !== undefined && state.season > ctx.maxSeason) return false;
 
-  const prestige = getTeam(state.teamId)?.prestige ?? 0;
+  const prestige = currentPrestige(state);
   if (ctx.minPrestige !== undefined && prestige < ctx.minPrestige) return false;
   if (ctx.maxPrestige !== undefined && prestige > ctx.maxPrestige) return false;
 

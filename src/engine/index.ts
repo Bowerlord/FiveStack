@@ -15,3 +15,5 @@ export { riskChance, riskPercent, riskStat } from "./risk";
 export { isAtCap, canRaisePotential, MAX_POTENTIAL_GAIN } from "./potential";
 export { arcLabel } from "./arcs";
 export { totalTitles } from "./context";
+export { isCrisisArc } from "./crisis";
+export { currentPrestige, teamPrestige, teamTrend, teamNote } from "./mercato";

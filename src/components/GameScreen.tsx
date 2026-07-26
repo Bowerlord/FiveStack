@@ -9,7 +9,7 @@ import Epilogue from "./Epilogue";
 import SeasonSummary from "./SeasonSummary";
 import FinalScore from "./FinalScore";
 import { ArcCard, ClutchCard, EventCard, OutcomeCard, PhaseResultCard } from "./GameCards";
-import { arcLabel } from "@/engine";
+import { arcLabel, isCrisisArc } from "@/engine";
 
 /**
  * Rendu de l'état de jeu courant. Partagé par l'app Next et la version autonome
@@ -54,6 +54,7 @@ export default function GameScreen({
         <ArcCard
           step={career.currentArcStep}
           label={career.currentArcId ? arcLabel(career.currentArcId) : "Ton histoire"}
+          crisis={isCrisisArc(career.currentArcId)}
           stats={career.stats}
           onChoose={onArc}
         />

@@ -24,14 +24,14 @@ export function computeFinalResult(state: PlayerState): FinalResult {
   const p = state.palmares;
 
   let score = 0;
-  score += p.worldsWon * 13;
+  score += p.worldsWon * 10;
   score += p.msiWon * 5;
   score += p.splitsWon * 2;
   score += p.worldsAppearances * 2;
   score += p.msiAppearances * 1;
   score += p.mvpAwards * 2;
   score += p.allProSelections * 1;
-  score += state.bestReputation * 0.14; // jusqu'à 16 pts
+  score += state.bestReputation * 0.13; // jusqu'à 16 pts
   score += state.stats.communaute * 0.06; // l'empreinte laissée sur la communauté
   score += clamp(state.stats.argent / 60000, 0, 5); // richesse (jusqu'à 5 pts)
 

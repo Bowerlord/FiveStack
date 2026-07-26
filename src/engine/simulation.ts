@@ -1,4 +1,5 @@
-import { getLeague, getTeam } from "@/data/teams";
+import { getLeague } from "@/data/teams";
+import { currentPrestige } from "./mercato";
 import type { Phase, PhaseResult, PlayerState } from "./types";
 import type { Rng } from "./rng";
 import { metaDelta } from "./meta";
@@ -17,7 +18,7 @@ export function phaseLabel(phase: Phase): string {
 }
 
 /** Niveau à battre sur la scène internationale : l'élite mondiale ne pardonne pas. */
-const WORLD_ELITE_LEVEL = 77;
+const WORLD_ELITE_LEVEL = 80;
 
 /** Seuils de classement, exprimés en marge de performance. */
 const CHAMPION = 15;
@@ -26,8 +27,9 @@ const PLAYOFFS = 0;
 
 /** Force compétitive du joueur pour la phase (0-100 environ, hors bruit). */
 function performanceBase(state: PlayerState): number {
-  const team = getTeam(state.teamId);
-  const prestige = team?.prestige ?? 40;
+  // Prestige réel, mercato compris : jouer dans une équipe qui s'est renforcée
+  // cet hiver doit peser dans les résultats.
+  const prestige = currentPrestige(state);
   const s = state.stats;
   return (
     0.42 * s.skill +
@@ -97,6 +99,7 @@ function resolveDomestic(
     placementText = `Champion du ${label.toLowerCase()} !`;
     detail = "Un run maîtrisé de bout en bout, ponctué d'une finale à sens unique.";
     state.palmares.splitsWon += 1;
+    state.titlesThisSeason += 1;
     applyEffect(state, { reputation: 9, morale: 9, chimie: 4, communaute: 7, argent: winnings(state, 8000) });
     qualify(state, phase);
     if (isQualified(state, phase)) qualifiedNext = `Qualifié pour le ${qualifiesInternational}`;
@@ -138,9 +141,10 @@ function resolveInternational(
   let detail: string;
   const isWorlds = phase === "worlds";
 
-  if (R >= (isWorlds ? 16 : 13)) {
+  if (R >= (isWorlds ? 18 : 15)) {
     placementText = isWorlds ? "🏆 CHAMPION DU MONDE !" : "🥇 Vainqueur du MSI !";
     detail = "Le sommet. Une performance qui restera dans les mémoires.";
+    state.titlesThisSeason += 1;
     if (isWorlds) {
       state.palmares.worldsWon += 1;
       applyEffect(state, { reputation: 22, morale: 16, communaute: 20, argent: 180000 });
@@ -149,7 +153,7 @@ function resolveInternational(
       applyEffect(state, { reputation: 12, morale: 12, communaute: 10, argent: 60000 });
     }
     maybeAwards(state, R, rng, true);
-  } else if (R >= (isWorlds ? 6 : 4)) {
+  } else if (R >= (isWorlds ? 7 : 5)) {
     placementText = isWorlds ? "Demi-finaliste mondial" : "Finaliste du MSI";
     detail = "Un parcours remarquable sur la scène internationale.";
     applyEffect(state, { reputation: 10, morale: 6, communaute: 8, argent: 30000 });

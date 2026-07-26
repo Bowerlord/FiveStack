@@ -11,6 +11,8 @@ import { buildClutchQueue, draftPenalty, loadClutch, stageForPhase } from "./clu
 import { metaDelta, pickLearnableArchetype, rollPatch } from "./meta";
 import { acceptOffer, buildOffers } from "./offers";
 import { advanceArc, dueArcStep, maybeStartArc } from "./arcs";
+import { pickCrisis } from "./crisis";
+import { runMercato } from "./mercato";
 import { riskChance } from "./risk";
 import { raisePotential } from "./potential";
 import { computeFinalResult } from "./scoring";
@@ -26,9 +28,23 @@ function popNextEvent(state: PlayerState): void {
 
 /**
  * Une étape de fil narratif échue passe avant le tirage aléatoire : une
- * histoire en cours prime toujours sur une situation anodine.
+ * histoire en cours prime toujours sur une situation anodine. Et une crise —
+ * plus un euro, un corps ou un mental à bout — passe avant tout le reste.
  */
 function tryArcStep(state: PlayerState, phase: Phase, rng: Rng): boolean {
+  const crisis = pickCrisis(state, phase);
+  if (crisis) {
+    state.activeArcs.push({
+      arcId: crisis.arc.id,
+      stepId: crisis.step.id,
+      dueSeason: state.season,
+    });
+    state.currentArcId = crisis.arc.id;
+    state.currentArcStep = crisis.step;
+    state.status = "arc";
+    return true;
+  }
+
   const due = dueArcStep(state, phase);
   if (due) {
     state.currentArcId = due.arcId;
@@ -45,9 +61,27 @@ function tryArcStep(state: PlayerState, phase: Phase, rng: Rng): boolean {
   return false;
 }
 
+/**
+ * L'alchimie d'un nouveau groupe se construit en jouant. Sans cette montée, la
+ * première saison dans un club était perdue d'avance : la chimie pèse 20 % de la
+ * performance, et arriver à 35 au lieu de 75 coûtait à lui seul plus que le
+ * seuil d'accès à une finale.
+ */
+function gelWithNewTeam(state: PlayerState, phase: Phase, rng: Rng): void {
+  if (state.seasonsAtTeam > 1) return;
+  // Uniquement en début de saison : les automatismes se prennent en pré-saison
+  // et sur les premières semaines de championnat, pas en octobre.
+  if (phase !== "preseason" && phase !== "spring") return;
+  // Et jamais jusqu'au niveau d'un groupe installé : rejoindre un nouveau club
+  // doit rester un pari, simplement plus un pari perdu d'avance.
+  if (state.stats.chimie >= 60) return;
+  applyEffect(state, { chimie: rng.int(4, 7) });
+}
+
 /** Entre dans une phase : tire ses événements, ou déclenche directement son issue. */
 export function enterPhase(state: PlayerState, phase: Phase, rng: Rng): void {
   state.phase = phase;
+  gelWithNewTeam(state, phase, rng);
   state.pendingEventIds = drawEvents(state, phase, rng);
   state.currentEvent = null;
   state.currentArcStep = null;
@@ -126,6 +160,7 @@ function beginSeason(state: PlayerState, rng: Rng): void {
   state.usedEventIds = [];
   state.qualifiedMSI = false;
   state.qualifiedWorlds = false;
+  state.titlesThisSeason = 0;
   state.seasonResults = [];
   state.seasonNarrative = [];
   state.transferNote = null;
@@ -146,6 +181,10 @@ function endSeason(state: PlayerState, rng: Rng): void {
 
 function runOffseason(state: PlayerState, rng: Rng): void {
   state.age += 1;
+
+  // Le marché bouge : des effectifs se renforcent, d'autres se vident. Les
+  // offres de l'intersaison s'appuieront là-dessus.
+  runMercato(state, rng);
 
   // Dérive de niveau selon l'âge (pic vers 22-24, déclin après 27).
   const age = state.age;
@@ -240,7 +279,14 @@ export function resolveChoice(input: PlayerState, choiceId: string): PlayerState
  */
 function applyChoiceEffects(
   state: PlayerState,
-  choice: { effects: Effect; learnsArchetype?: boolean; raisesPotential?: number; collapsesOrg?: boolean; arcNext?: { stepId: string | null; delaySeasons?: number } },
+  choice: {
+    effects: Effect;
+    learnsArchetype?: boolean;
+    raisesPotential?: number;
+    collapsesOrg?: boolean;
+    endsCareer?: boolean;
+    arcNext?: { stepId: string | null; delaySeasons?: number };
+  },
   effects: Effect,
   rng: Rng,
 ): { suffix: string; extra: { skillWasted?: number; potentialRaised?: number } } {
@@ -271,6 +317,13 @@ function applyChoiceEffects(
   if (choice.collapsesOrg) {
     state.orgCollapsed = true;
     suffix += " La structure fermera ses portes : tu seras libre à la fin de la saison.";
+  }
+
+  // Certaines issues de crise arrêtent la carrière sur place : on ne finit pas
+  // la saison, on passe directement à l'après.
+  if (choice.endsCareer) {
+    state.retired = true;
+    state.careerEndedEarly = true;
   }
 
   if (state.currentArcId) {
@@ -379,6 +432,13 @@ export function next(input: PlayerState): PlayerState {
       enterPhase(state, "preseason", rng);
       break;
     case "event_result":
+      // Une crise a pu mettre un terme à la carrière séance tenante : on ne
+      // termine ni la phase ni la saison.
+      if (state.careerEndedEarly) {
+        state.lastSeasonSummary = buildSeasonSummary(state);
+        state.status = "epilogue";
+        break;
+      }
       if (state.pendingEventIds.length > 0) popNextEvent(state);
       else startPhaseOutcome(state, rng);
       break;

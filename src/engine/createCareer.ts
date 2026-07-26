@@ -1,6 +1,6 @@
 import { ENTOURAGES, LIFESTYLES, ORIGINS, getOption } from "@/data/attributes";
 import { archetypesForRole } from "@/data/archetypes";
-import { getLeague, getTeam } from "@/data/teams";
+import { getLeague, getTeam, isExpatriation } from "@/data/teams";
 import type { CreationChoices, Effect, PlayerState, Stats } from "./types";
 import { Rng } from "./rng";
 import { rollPatch } from "./meta";
@@ -96,12 +96,16 @@ export function startCareer(creation: CreationChoices, seed: number): PlayerStat
     clutchStage: null,
     offers: [],
     orgCollapsed: false,
+    teamDeltas: {},
+    teamNotes: {},
     activeArcs: [],
     completedArcs: [],
     currentArcStep: null,
     currentArcId: null,
     qualifiedMSI: false,
     qualifiedWorlds: false,
+    titlesThisSeason: 0,
+    careerEndedEarly: false,
     seasonResults: [],
     seasonNarrative: [],
     transferNote: null,
@@ -117,6 +121,17 @@ export function startCareer(creation: CreationChoices, seed: number): PlayerStat
     getOption(ENTOURAGES, creation.entourageId)?.effects ?? {},
   ];
   for (const b of bonuses) applyEffect(state, b);
+
+  // Débuter hors de son marché, c'est partir avec un handicap réel : la langue,
+  // le décalage, l'absence de repères. Un Français en LCK Challengers le paie
+  // autant qu'un Coréen en LFL.
+  if (isExpatriation(creation.nationalityId, creation.startTeamId)) {
+    applyEffect(state, { chimie: -10, morale: -6, reputation: 2 });
+    state.seasonNarrative.push(
+      "✈️ Tu débutes ta carrière loin de chez toi : tout est à apprendre, la langue comprise.",
+    );
+  }
+
   state.stats = normalizeStats(state.stats);
   state.bestReputation = Math.max(state.bestReputation, state.stats.reputation);
 

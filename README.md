@@ -40,7 +40,8 @@ npm run build:standalone  # génère dist/fivestack.html (jeu complet en un seul
 ## Comment on joue
 
 1. **Création** : pseudo, nationalité, rôle (Top/Jungle/Mid/ADC/Support), **style de prédilection**,
-   parcours, mode de vie, entourage et équipe de départ — chaque option applique des bonus/malus.
+   parcours, mode de vie, entourage et équipe de départ — les filières de ton pays d'abord. Chaque
+   option applique des bonus/malus.
 2. **Patch notes** en début de saison : ce qui est renforcé, ce qui est affaibli, et l'effet sur
    **ton** pool de champions.
 3. **Carrière** : pré-saison (mercato, travail du pool) puis split de printemps, MSI (si qualifié),
@@ -48,11 +49,13 @@ npm run build:standalone  # génère dist/fivestack.html (jeu complet en un seul
    tu prends la main sur la **draft** et sur un **call décisif**.
 4. **Bilan** de fin de saison, puis **choix de ton avenir** : prolonger, rejoindre une grande écurie,
    un projet à bâtir, ou partir en LCK/LPL (avec la barrière de la langue).
-5. **Reconversion** au moment de raccrocher : streamer, coach, analyste, patron de structure ou
-   tourner la page — selon ce que tu as construit.
+5. **Reconversion** au moment de raccrocher — de ton plein gré, ou parce qu'une crise a tranché pour
+   toi : streamer, coach, analyste, patron de structure ou tourner la page.
 6. **Verdict** : score /100, rang et palmarès.
 
 **Statistiques** : Skill, Cote (réputation pro), Moral, Forme, Chimie d'équipe, **Communauté**, Argent.
+L'**argent** n'est pas décoratif : il paie un coach personnel, un suivi médical, un déménagement — ou
+il dort sur ton compte et rapporte jusqu'à 5 points au bilan. Tomber à zéro déclenche une crise.
 Ton **rang SoloQ** est dérivé de ton niveau et affiché en permanence : en esport, ta vitrine est publique.
 
 ### Ce qui fait l'identité esport du jeu
@@ -73,7 +76,18 @@ Ton **rang SoloQ** est dérivé de ton niveau et affiché en permanence : en esp
 - **Ladder SoloQ & communauté** — clips viraux, threads Reddit, memes, vagues de haine.
 - **Instabilité des orgs** — sponsors qui partent, salaires impayés, structures qui coulent. Quand ton
   org met la clé sous la porte, l'option « prolonger » disparaît vraiment du mercato.
-- **Reconversion** — la carrière s'arrête à 25 ans ; le second acte fait partie du bilan.
+- **Crises** — quand une jauge touche le fond (plus un euro, corps ou mental à bout), le jeu t'arrête
+  et te met devant un choix qui peut mettre un terme à la carrière, sur le champ.
+- **L'argent s'échange contre de la performance** — coach personnel, kiné à plein temps, appartement
+  près du gaming house, aide à ta famille. Ton magot compte jusqu'à 5 points dans le score final :
+  dépenser est un arbitrage, pas une évidence.
+- **Mercato** — les effectifs bougent chaque hiver. Une équipe se renforce, une autre perd ses
+  titulaires, et les propositions de contrat le disent noir sur blanc.
+- **Cohérence régionale** — tu débutes dans la filière de ton pays (LCK Challengers pour un Coréen,
+  LFL pour un Français). Partir ailleurs dès tes débuts coûte cher en adaptation, et changer de club
+  au sein d'une même région n'est pas un « départ à l'étranger ».
+- **Reconversion** — on raccroche entre 27 et 33 ans, parfois bien plus tôt sur une crise ; le
+  second acte fait partie du bilan.
 
 ## Architecture
 
@@ -93,6 +107,8 @@ src/
     potential.ts         Plafond de talent et conditions pour le repousser
     context.ts           Filtrage des situations selon l'état de la carrière
     arcs.ts              Fils narratifs multi-saisons (un seul actif à la fois)
+    crisis.ts            Crises imposées quand une jauge touche le fond
+    mercato.ts           Prestige des équipes qui évolue d'une saison à l'autre
     meta.ts              Patchs, pool de champions, risque de ban out
     offers.ts            Offres de contrat de l'intersaison
     epilogue.ts          Voies de reconversion
@@ -100,9 +116,11 @@ src/
     progression.ts       Orchestrateur : phases → saisons → transferts → retraite
     scoring.ts           Score final /100 et rang
   data/                  Contenu FR (rôles, archétypes, ligues, équipes)
-    events/              ~99 événements par thème (dont ~20 propres à chaque poste)
+    events/              ~104 événements par thème (dont ~20 propres à chaque poste)
       context.fr.ts      Situations liées au contexte (ligue, palmarès, ancienneté…)
+      money.fr.ts        Ce qu'on peut s'acheter quand on en a les moyens
     arcs.fr.ts           Les 5 arcs multi-saisons et leurs embranchements
+    crises.fr.ts         Les 3 fils de crise, dont les issues fatales
     clutch.fr.ts         Séquences de draft et de calls décisifs
   state/gameStore.ts     Store Zustand + sauvegarde localStorage
   components/            Composants d'interface
@@ -124,8 +142,8 @@ actuellement :
 
 | | Score moyen | Médiane | Titre mondial | % GOAT |
 |---|---|---|---|---|
-| Choix aléatoires | 45,2 | 42 | 8,0 % | 2,4 % |
-| Choix réfléchis | **79,3** | 82 | 54,0 % | 42,0 % |
+| Choix aléatoires | 46,6 | 43 | 7,0 % | 3,2 % |
+| Choix réfléchis | **80,4** | 87 | 47,8 % | 47,4 % |
 
 L'écart entre les deux lignes est la mesure qui compte : c'est lui qui dit si les choix pèsent
 vraiment. Des tests verrouillent ces invariants pour éviter toute dérive.

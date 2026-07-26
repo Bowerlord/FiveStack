@@ -20,8 +20,9 @@ export const SPLIT_EVENTS: GameEvent[] = [
       {
         id: "reset",
         label: "Prendre un jour off avec l'équipe",
-        effects: { morale: 7, chimie: 5, skill: -1 },
-        resultText: "Une journée pour souffler ensemble ressoude le groupe.",
+        effects: { forme: 8, morale: 7, chimie: 5, skill: -1 },
+        resultText:
+          "Une journée pour souffler ensemble ressoude le groupe, et tu reviens physiquement frais.",
       },
       {
         id: "media",

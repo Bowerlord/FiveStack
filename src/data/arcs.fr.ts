@@ -1,4 +1,5 @@
 import type { Arc } from "@/engine/types";
+import { CRISES } from "./crises.fr";
 
 // Fils narratifs multi-saisons. Chaque arc démarre selon le contexte, revient
 // plus tard, et se referme sur une issue qui dépend de tes choix — certaines
@@ -438,6 +439,9 @@ export const ARCS: Arc[] = [
   },
 ];
 
+/** Tous les fils, crises comprises : c'est ce registre que le moteur consulte. */
+export const ALL_ARCS: Arc[] = [...ARCS, ...CRISES];
+
 export function getArc(id: string): Arc | undefined {
-  return ARCS.find((a) => a.id === id);
+  return ALL_ARCS.find((a) => a.id === id);
 }

@@ -8,18 +8,37 @@ export const ROLES: { id: Role; label: string; description: string }[] = [
   { id: "Support", label: "Support", description: "Le cerveau. Vision, engages et protection du carry." },
 ];
 
+// La région conditionne où l'on débute et où l'on serait considéré comme import.
 export const NATIONALITIES: Nationality[] = [
-  { id: "fr", name: "France", flag: "🇫🇷" },
-  { id: "kr", name: "Corée du Sud", flag: "🇰🇷" },
-  { id: "dk", name: "Danemark", flag: "🇩🇰" },
-  { id: "de", name: "Allemagne", flag: "🇩🇪" },
-  { id: "es", name: "Espagne", flag: "🇪🇸" },
-  { id: "cn", name: "Chine", flag: "🇨🇳" },
-  { id: "se", name: "Suède", flag: "🇸🇪" },
-  { id: "pl", name: "Pologne", flag: "🇵🇱" },
-  { id: "si", name: "Slovénie", flag: "🇸🇮" },
-  { id: "be", name: "Belgique", flag: "🇧🇪" },
+  { id: "fr", name: "France", flag: "🇫🇷", region: "France" },
+  { id: "kr", name: "Corée du Sud", flag: "🇰🇷", region: "Corée" },
+  { id: "dk", name: "Danemark", flag: "🇩🇰", region: "Europe" },
+  { id: "de", name: "Allemagne", flag: "🇩🇪", region: "Allemagne" },
+  { id: "es", name: "Espagne", flag: "🇪🇸", region: "Espagne" },
+  { id: "cn", name: "Chine", flag: "🇨🇳", region: "Chine" },
+  { id: "se", name: "Suède", flag: "🇸🇪", region: "Europe" },
+  { id: "pl", name: "Pologne", flag: "🇵🇱", region: "Europe" },
+  { id: "si", name: "Slovénie", flag: "🇸🇮", region: "Europe" },
+  { id: "be", name: "Belgique", flag: "🇧🇪", region: "Europe" },
 ];
+
+/** Les régions européennes forment un même marché : on n'y est pas un import. */
+const EUROPEAN_REGIONS = ["France", "Espagne", "Allemagne", "Europe"];
+
+export function isEuropean(region: string): boolean {
+  return EUROPEAN_REGIONS.includes(region);
+}
+
+/** Deux régions appartiennent-elles au même marché de joueurs ? */
+export function sameMarket(a: string, b: string): boolean {
+  if (a === b) return true;
+  return isEuropean(a) && isEuropean(b);
+}
+
+/** Région d'origine du joueur, d'après sa nationalité. */
+export function homeRegion(nationalityId: string): string {
+  return NATIONALITIES.find((n) => n.id === nationalityId)?.region ?? "Europe";
+}
 
 // Origine / parcours du joueur.
 export const ORIGINS: CreationOption[] = [

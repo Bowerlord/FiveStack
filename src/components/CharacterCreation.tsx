@@ -9,12 +9,10 @@ import {
   ORIGINS,
   ROLES,
 } from "@/data/attributes";
-import { getStartTeams } from "@/data/teams";
+import { getStartTeamsFor, isExpatriation } from "@/data/teams";
 import { getLeague } from "@/data/teams";
 import { archetypesForRole } from "@/data/archetypes";
 import { effectLines } from "@/lib/display";
-
-const START_TEAMS = getStartTeams();
 
 const STEPS = ["Identité", "Rôle", "Style", "Parcours", "Mode de vie", "Entourage", "Équipe"] as const;
 
@@ -30,7 +28,7 @@ export default function CharacterCreation({
   const [originId, setOriginId] = useState("soloq");
   const [lifestyleId, setLifestyleId] = useState("equilibre");
   const [entourageId, setEntourageId] = useState("coach");
-  const [startTeamId, setStartTeamId] = useState(START_TEAMS[0].id);
+  const [startTeamId, setStartTeamId] = useState(getStartTeamsFor("fr")[0].id);
   const [signatureId, setSignatureId] = useState(archetypesForRole("Mid")[0].id);
 
   // Changer de rôle invalide la signature : chaque poste a ses propres styles.
@@ -38,6 +36,12 @@ export default function CharacterCreation({
   const currentSignature = roleArchetypes.some((a) => a.id === signatureId)
     ? signatureId
     : roleArchetypes[0].id;
+
+  // Changer de nationalité réordonne les filières : celles de ton pays d'abord.
+  const startTeams = getStartTeamsFor(nationalityId);
+  const currentStartTeam = startTeams.some((t) => t.id === startTeamId)
+    ? startTeamId
+    : startTeams[0].id;
 
   const canNext = step === 0 ? pseudo.trim().length > 0 : true;
   const isLast = step === STEPS.length - 1;
@@ -50,7 +54,7 @@ export default function CharacterCreation({
       originId,
       lifestyleId,
       entourageId,
-      startTeamId,
+      startTeamId: currentStartTeam,
       signatureId: currentSignature,
     });
   }
@@ -178,19 +182,24 @@ export default function CharacterCreation({
         <div>
           <StepTitle>Ta première équipe</StepTitle>
           <p className="mb-4 text-sm text-white/60">
-            Tu débutes dans une ligue régionale. À toi de gravir les échelons vers la LEC, la LCK… et
-            les Worlds.
+            Tu débutes dans une filière de formation, celles de ton pays en premier. À toi de gravir
+            les échelons vers la LEC, la LCK… et les Worlds.
           </p>
           <div className="space-y-2">
-            {START_TEAMS.map((t) => {
+            {startTeams.map((t) => {
               const league = getLeague(t.leagueId);
+              const expat = isExpatriation(nationalityId, t.id);
               return (
                 <SelectableRow
                   key={t.id}
-                  selected={startTeamId === t.id}
+                  selected={currentStartTeam === t.id}
                   onClick={() => setStartTeamId(t.id)}
-                  title={t.name}
-                  description={`${league?.name} · ${league?.region} · Prestige ${t.prestige}/100`}
+                  title={expat ? `${t.name} · ✈️ expatriation` : t.name}
+                  description={
+                    expat
+                      ? `${league?.name} · ${league?.region} · Prestige ${t.prestige}/100 — loin de chez toi : −10 chimie, −6 moral`
+                      : `${league?.name} · ${league?.region} · Prestige ${t.prestige}/100`
+                  }
                 />
               );
             })}

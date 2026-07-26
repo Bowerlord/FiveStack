@@ -8,6 +8,7 @@ const KIND_BADGE: Record<Offer["kind"], { label: string; className: string }> = 
   major: { label: "Grande écurie", className: "bg-neon-gold/20 text-neon-gold" },
   rebuild: { label: "Projet à bâtir", className: "bg-neon-blue/20 text-neon-blue" },
   import: { label: "Départ à l'étranger", className: "bg-neon-pink/20 text-neon-pink" },
+  homecoming: { label: "Retour au pays", className: "bg-emerald-500/20 text-emerald-300" },
   erl: { label: "Ligue régionale", className: "bg-white/15 text-white/80" },
 };
 

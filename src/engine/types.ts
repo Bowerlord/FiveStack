@@ -27,6 +27,8 @@ export interface Nationality {
   id: string;
   name: string;
   flag: string; // emoji drapeau
+  /** Région d'origine : un Coréen ne débute pas en LFL, et y serait un import. */
+  region: string;
 }
 
 /** Un style de jeu maîtrisable. Le patch en renforce et en affaiblit chaque saison. */
@@ -103,6 +105,8 @@ export interface Choice {
   raisesPotential?: number;
   /** Libère le joueur de son contrat : la structure ne peut plus le retenir. */
   collapsesOrg?: boolean;
+  /** Met un terme immédiat à la carrière : on passe directement à la reconversion. */
+  endsCareer?: boolean;
   /** Fait avancer l'arc narratif en cours vers une étape donnée (null = fin). */
   arcNext?: { stepId: string | null; delaySeasons?: number };
 }
@@ -167,6 +171,12 @@ export interface Arc {
   /** Conditions de démarrage. */
   trigger?: EventContext;
   weight?: number;
+  /**
+   * Fil de crise : il ne se tire pas au hasard, il s'impose dès que la
+   * condition est remplie (plus un euro, corps ou mental à bout). Prioritaire
+   * sur tout le reste, et jamais plus d'une fois par carrière.
+   */
+  critical?: boolean;
 }
 
 /** Un fil en cours : quelle étape vient ensuite, et à partir de quelle saison. */
@@ -200,7 +210,7 @@ export interface Patch {
   headline: string;
 }
 
-export type OfferKind = "stay" | "major" | "rebuild" | "import" | "erl";
+export type OfferKind = "stay" | "major" | "rebuild" | "import" | "homecoming" | "erl";
 
 /** Proposition de contrat à l'intersaison. */
 export interface Offer {
@@ -377,6 +387,14 @@ export interface PlayerState {
   offers: Offer[];
   /** La structure a cessé son activité : impossible de prolonger. */
   orgCollapsed: boolean;
+  /**
+   * Mercato : écart de prestige accumulé par chaque équipe depuis le début de
+   * la carrière. Les effectifs bougent — une équipe se renforce, une autre perd
+   * ses titulaires — et les propositions de contrat le disent.
+   */
+  teamDeltas: Record<string, number>;
+  /** Ce qui s'est passé cet hiver chez chaque équipe, en une phrase. */
+  teamNotes: Record<string, string>;
 
   // Fils narratifs
   activeArcs: ActiveArc[];
@@ -388,6 +406,10 @@ export interface PlayerState {
   // Flags de saison
   qualifiedMSI: boolean;
   qualifiedWorlds: boolean;
+  /** Titres remportés cette saison : c'est eux qui attirent les recruteurs. */
+  titlesThisSeason: number;
+  /** La carrière s'est arrêtée en cours de saison (blessure, ruine, burnout). */
+  careerEndedEarly: boolean;
   seasonResults: SeasonResultLine[];
   seasonNarrative: string[];
   transferNote: string | null;

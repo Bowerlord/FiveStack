@@ -10,7 +10,7 @@ import type {
   Stats,
 } from "@/engine/types";
 import { meetsRequirements, missingRequirements, riskPercent, riskStat } from "@/engine";
-import { effectLines, statLabel } from "@/lib/display";
+import { effectLines, formatArgent, statLabel } from "@/lib/display";
 
 /**
  * Bouton de choix. Les options verrouillées restent visibles avec leur
@@ -32,6 +32,9 @@ export function ChoiceButton({
   const govStat = choice.risk ? riskStat(choice.risk) : null;
   const unlocked = meetsRequirements(stats, choice.requires);
   const missing = missingRequirements(stats, choice.requires);
+  // Ce que l'option prélève sur ton compte : l'argent sert à s'acheter ce que le
+  // club ne fournit pas, autant que ce soit lisible avant de cliquer.
+  const cost = Math.max(0, -(choice.effects.argent ?? 0));
 
   if (!unlocked) {
     return (
@@ -63,6 +66,17 @@ export function ChoiceButton({
       {choice.raisesPotential !== undefined && (
         <span className="mt-1.5 block text-xs font-semibold text-neon-cyan">
           ⛰️ Peut repousser ton plafond de talent
+        </span>
+      )}
+      {cost > 0 && (
+        <span className="mt-1.5 block text-xs font-semibold text-neon-gold">
+          💰 Te coûte {formatArgent(cost)} — il t&apos;en restera{" "}
+          {formatArgent(stats.argent - cost)}
+        </span>
+      )}
+      {choice.endsCareer && (
+        <span className="mt-1.5 block text-xs font-bold text-rose-300">
+          ⛔ Met fin à ta carrière immédiatement
         </span>
       )}
     </button>
@@ -140,19 +154,33 @@ export function ArcCard({
   step,
   label,
   stats,
+  crisis = false,
   onChoose,
 }: {
   step: ArcStep;
   label: string;
   stats: Stats;
+  /** Une crise se distingue d'un fil ordinaire : la carrière peut s'y arrêter. */
+  crisis?: boolean;
   onChoose: (choiceId: string) => void;
 }) {
   return (
-    <div className="card overflow-hidden border-neon-violet/40">
-      <div className="bg-gradient-to-r from-neon-violet/30 to-neon-pink/15 px-6 py-3">
+    <div className={`card overflow-hidden ${crisis ? "border-rose-400/60" : "border-neon-violet/40"}`}>
+      <div
+        className={
+          crisis
+            ? "bg-gradient-to-r from-rose-500/35 to-rose-400/10 px-6 py-3"
+            : "bg-gradient-to-r from-neon-violet/30 to-neon-pink/15 px-6 py-3"
+        }
+      >
         <div className="text-xs font-bold uppercase tracking-[0.2em] text-white/80">
-          📖 {label}
+          {crisis ? "🚨" : "📖"} {label}
         </div>
+        {crisis && (
+          <div className="mt-1 text-xs text-rose-200/90">
+            Ta carrière peut s&apos;arrêter ici. Lis bien avant de trancher.
+          </div>
+        )}
       </div>
       <div className="p-6">
         <h2 className="text-xl font-bold text-white">{step.title}</h2>
